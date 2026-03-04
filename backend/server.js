@@ -4,13 +4,10 @@ const fetch   = require("node-fetch");
 require("dotenv").config();
 
 const app  = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
 
-const allowedOrigins = [
-  "http://localhost:5173",
-  "http://localhost:4173",
-  process.env.FRONTEND_URL,
-].filter(Boolean);
+app.use(cors());
+app.use(express.json({ limit: "10mb" }));
 
 app.use(cors({
   origin: function (origin, callback) {
