@@ -85,18 +85,3 @@ app.listen(PORT, () => {
 });
 
 module.exports = app;
-```
-
-4. **Ctrl+S** to save
-
----
-
-## File 4 — `backend/.env.example`
-
-1. Click **New File** icon
-2. Type: `backend/.env.example` → Enter
-3. Paste:
-```
-ANTHROPIC_API_KEY=your_anthropic_api_key_here
-FRONTEND_URL=
-PORT=3001
