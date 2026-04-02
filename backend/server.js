@@ -280,11 +280,7 @@ app.get("/api/jobs", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch jobs" });
   }
 });
-```
 
-
-```
-https://decision-intelligence-el9w.onrender.com/api/jobs?role=software engineer&location=Hyderabad
 /*
 --------------------------------
 404 HANDLER
