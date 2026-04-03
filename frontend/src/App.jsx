@@ -266,14 +266,14 @@ export default function App() {
   }, []);
 
   async function loadUserProfile(userId) {
-    const { data } = await supabase.from("users").select("*").eq("id", userId).single();
-    if (data) {
-      setProfile(data);
-      setPhase(PHASE.HOME);
-    } else {
-      setPhase(PHASE.PROFILE);
-    }
-  }
+  const { data } = await supabase
+    .from("users")
+    .select("*")
+    .eq("id", userId)
+    .maybeSingle();
+  if (data) { setProfile(data); setPhase(PHASE.HOME); } 
+  else { setPhase(PHASE.PROFILE); }
+}
 
   async function sendMagicLink() {
     if (!email.trim()) return;
@@ -287,14 +287,35 @@ export default function App() {
   }
 
   async function saveProfile() {
-    if (!draftBG.trim() || !user) return;
-    setLoading(true);
-    const profileData = { id: user.id, email: user.email, full_name: draftName.trim(), background: draftBG.trim() };
-    const { data, error } = await supabase.from("users").upsert(profileData).select().single();
-    if (!error && data) { setProfile(data); setPhase(PHASE.HOME); }
-    else { setError("Failed to save profile. Please try again."); }
-    setLoading(false);
+  if (!draftBG.trim() || !user) return;
+  setLoading(true);
+  setError("");
+  try {
+    const profileData = { 
+      id: user.id, 
+      email: user.email, 
+      full_name: draftName.trim(), 
+      background: draftBG.trim() 
+    };
+    const { data, error } = await supabase
+      .from("users")
+      .upsert(profileData, { onConflict: "id", ignoreDuplicates: false })
+      .select()
+      .maybeSingle();
+    if (error) { 
+      console.error("Supabase error:", error.message, error.code);
+      setError(error.message); 
+    } else { 
+      setProfile(data); 
+      setPhase(PHASE.HOME); 
+    }
+  } catch (err) { 
+    console.error("Unexpected:", err);
+    setError("Failed to save profile. Please try again."); 
   }
+  setLoading(false);
+}
+  
 
   async function saveAssessment(matchScore) {
     if (!user) return;
