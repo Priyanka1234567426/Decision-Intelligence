@@ -1,3 +1,4 @@
+// EasyJob v2 - auth update
 import { useState, useRef, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 
