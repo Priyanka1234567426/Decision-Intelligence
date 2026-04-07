@@ -244,24 +244,27 @@ export default function App() {
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [phase, loading]);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setUser(session.user);
-        loadUserProfile(session.user.id);
-      } else {
-        setPhase(PHASE.AUTH);
-      }
-    });
-    supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        setUser(session.user);
-        loadUserProfile(session.user.id);
-      } else {
-        setUser(null);
-        setPhase(PHASE.AUTH);
-      }
-    });
-  }, []);
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    if (session?.user) {
+      setUser(session.user);
+      loadUserProfile(session.user.id);
+    } else {
+      setPhase(PHASE.AUTH);
+    }
+  });
+
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    if (session?.user) {
+      setUser(session.user);
+      loadUserProfile(session.user.id);
+    } else {
+      setUser(null);
+      setPhase(PHASE.AUTH);
+    }
+  });
+
+  return () => subscription.unsubscribe();
+}, []);
 
  async function signInWithGoogle() {
   setLoading(true);
