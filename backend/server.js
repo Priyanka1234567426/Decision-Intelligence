@@ -235,6 +235,9 @@ JOBS API
 Fetches real jobs from JSearch (aggregates LinkedIn, Indeed, Glassdoor)
 User sends a role and location, we return matching jobs
 */
+const jobsCache = {};
+const CACHE_TTL = 2 * 60 * 60 * 1000;
+
 app.get("/api/jobs", async (req, res) => {
   const { role, location } = req.query;
 
@@ -242,11 +245,17 @@ app.get("/api/jobs", async (req, res) => {
     return res.status(400).json({ error: "role is required" });
   }
 
-  const query = location ? `${role} in ${location}` : role;
+  const cacheKey = role + "_" + (location || "India");
+  const cached = jobsCache[cacheKey];
+  if (cached && Date.now() - cached.time < CACHE_TTL) {
+    return res.json(cached.data);
+  }
+
+  const query = location ? role + " in " + location : role;
 
   try {
     const response = await fetch(
-      `https://jsearch.p.rapidapi.com/search?query=${encodeURIComponent(query)}&page=1&num_pages=1&country=in&date_posted=month`,
+      "https://jsearch.p.rapidapi.com/search?query=" + encodeURIComponent(query) + "&page=1&num_pages=1&country=in&date_posted=month",
       {
         method: "GET",
         headers: {
@@ -262,18 +271,25 @@ app.get("/api/jobs", async (req, res) => {
       return res.status(response.status).json({ error: "Jobs API error" });
     }
 
-    // Clean the data — only send what frontend needs
-    const jobs = data.data?.map(job => ({
-      id: job.job_id,
-      title: job.job_title,
-      company: job.employer_name,
-      location: job.job_city || job.job_country,
-      description: job.job_description?.slice(0, 500),
-      url: job.job_apply_link,
-      posted: job.job_posted_at_datetime_utc
-    })) || [];
+    const jobs = [];
+    if (data.data && data.data.length > 0) {
+      for (let i = 0; i < data.data.length; i++) {
+        const job = data.data[i];
+        jobs.push({
+          id: job.job_id,
+          title: job.job_title,
+          company: job.employer_name,
+          location: job.job_city || job.job_country,
+          description: job.job_description ? job.job_description.substring(0, 800) : "",
+          url: job.job_apply_link,
+          posted: job.job_posted_at_datetime_utc
+        });
+      }
+    }
 
-    res.json({ jobs, total: jobs.length });
+    const result = { jobs, total: jobs.length };
+    jobsCache[cacheKey] = { data: result, time: Date.now() };
+    res.json(result);
 
   } catch (error) {
     console.error("Jobs API error:", error.message);
