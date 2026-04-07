@@ -277,18 +277,6 @@ export default function App() {
   });
   if (error) { setError(error.message); setLoading(false); }
 }
-
-  async function sendMagicLink() {
-    if (!email.trim()) return;
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-      options: { emailRedirectTo: window.location.origin }
-    });
-    if (error) { setError(error.message); } else { setMagicSent(true); }
-    setLoading(false);
-  }
-
   async function saveProfile() {
   if (!draftBG.trim() || !user) return;
   setLoading(true);
@@ -329,6 +317,21 @@ export default function App() {
       match_score: matchScore
     });
   }
+
+  async function loadUserProfile(userId) {
+  try {
+    const { data } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", userId)
+      .maybeSingle();
+    if (data) { setProfile(data); setPhase(PHASE.HOME); }
+    else { setPhase(PHASE.PROFILE); }
+  } catch (err) {
+    setPhase(PHASE.PROFILE);
+  }
+}
+
 
   async function loadCandidates() {
     const { data } = await supabase
