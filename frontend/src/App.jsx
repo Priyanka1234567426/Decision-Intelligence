@@ -244,21 +244,24 @@ export default function App() {
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [phase, loading]);
 
   useEffect(() => {
-  supabase.auth.getSession().then(({ data: { session } }) => {
+  const handleSession = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
     if (session?.user) {
       setUser(session.user);
       loadUserProfile(session.user.id);
     } else {
       setPhase(PHASE.AUTH);
     }
-  });
+  };
 
-  const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+  handleSession();
+
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    console.log("Auth event:", event, session?.user?.email);
     if (session?.user) {
       setUser(session.user);
       loadUserProfile(session.user.id);
     } else {
-      setUser(null);
       setPhase(PHASE.AUTH);
     }
   });
