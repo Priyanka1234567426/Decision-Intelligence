@@ -1,7 +1,5 @@
 import { useState, useRef, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
-const [draftCompany, setDraftCompany] = useState("");
-const [draftHrRole, setDraftHrRole] = useState("");
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
 const supabase = createClient(
@@ -84,77 +82,7 @@ const PHASE = {
   HR: "hr"
 };
 
-{/* ROLE SELECTION — first time users only */}
-{phase === PHASE.ROLE_SELECT && (
-  <div style={{ animation: "fadeUp 0.3s ease forwards" }}>
-    <div style={{ textAlign: "center", marginBottom: "2rem" }}>
-      <h2 style={{ fontFamily: "var(--fd)", fontSize: "1.4rem", color: "#fff", margin: "0 0 0.5rem" }}>
-        Welcome to EasyJob
-      </h2>
-      <p style={{ color: "var(--mu)", fontSize: "0.85rem" }}>
-        Tell us how you want to use EasyJob
-      </p>
-    </div>
 
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-      {/* Seeker card */}
-      <button onClick={() => {
-        setUserRole("seeker");
-        setPhase(PHASE.SETUP_INFO);
-      }} style={{
-        background: "rgba(255,255,255,0.02)",
-        border: "1px solid rgba(255,255,255,0.08)",
-        borderRadius: 16, padding: "2rem 1.25rem",
-        cursor: "pointer", textAlign: "center",
-        transition: "all 0.2s", fontFamily: "var(--fb)"
-      }}
-        onMouseOver={(e) => {
-          e.currentTarget.style.borderColor = "var(--a)";
-          e.currentTarget.style.background = "rgba(99,212,170,0.06)";
-        }}
-        onMouseOut={(e) => {
-          e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
-          e.currentTarget.style.background = "rgba(255,255,255,0.02)";
-        }}>
-        <div style={{ fontSize: "2.5rem", marginBottom: "0.75rem" }}>👤</div>
-        <div style={{ color: "#fff", fontSize: "1rem", fontWeight: 700, fontFamily: "var(--fd)", marginBottom: "0.5rem" }}>
-          I am looking for a job
-        </div>
-        <div style={{ color: "var(--mu)", fontSize: "0.78rem", lineHeight: 1.5 }}>
-          Get matched to real jobs. Tailored resume. AI match score.
-        </div>
-      </button>
-
-      {/* HR card */}
-      <button onClick={() => {
-        setUserRole("hr");
-        setPhase(PHASE.HR_SETUP);
-      }} style={{
-        background: "rgba(255,255,255,0.02)",
-        border: "1px solid rgba(255,255,255,0.08)",
-        borderRadius: 16, padding: "2rem 1.25rem",
-        cursor: "pointer", textAlign: "center",
-        transition: "all 0.2s", fontFamily: "var(--fb)"
-      }}
-        onMouseOver={(e) => {
-          e.currentTarget.style.borderColor = "#60a5fa";
-          e.currentTarget.style.background = "rgba(96,165,250,0.06)";
-        }}
-        onMouseOut={(e) => {
-          e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
-          e.currentTarget.style.background = "rgba(255,255,255,0.02)";
-        }}>
-        <div style={{ fontSize: "2.5rem", marginBottom: "0.75rem" }}>🏢</div>
-        <div style={{ color: "#fff", fontSize: "1rem", fontWeight: 700, fontFamily: "var(--fd)", marginBottom: "0.5rem" }}>
-          I am hiring
-        </div>
-        <div style={{ color: "var(--mu)", fontSize: "0.78rem", lineHeight: 1.5 }}>
-          Review pre-scored candidates. Build your pipeline. Log outcomes.
-        </div>
-      </button>
-    </div>
-  </div>
-)}
 {/* HR SETUP — first time HR users */}
 {phase === PHASE.HR_SETUP && (
   <Card>
@@ -447,6 +375,8 @@ export default function App() {
   const [candidates, setCandidates] = useState([]);
   const [selectedCandidate, setSelectedCandidate] = useState(null);
   const bottomRef = useRef(null);
+  const [draftCompany, setDraftCompany] = useState("");
+  const [draftHrRole, setDraftHrRole] = useState("");
 
 async function loadUserProfile(userId) {
   try {
@@ -693,6 +623,149 @@ async function loadUserProfile(userId) {
                   <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20H24v8h11.3C33.6 33.1 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.7 1.1 7.8 2.9l5.7-5.7C34.1 6.5 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c11 0 20-8.9 20-20 0-1.3-.1-2.7-.4-4z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 16 19 13 24 13c3 0 5.7 1.1 7.8 2.9l5.7-5.7C34.1 6.5 29.3 4 24 4c-7.7 0-14.3 4.4-17.7 10.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-1.9 13.5-5l-6.2-5.2C29.4 35.5 26.8 36 24 36c-5.2 0-9.6-2.9-11.3-7.1l-6.5 5C9.6 39.4 16.3 44 24 44z"/><path fill="#1976D2" d="M43.6 20H24v8h11.3c-.8 2.3-2.3 4.3-4.3 5.8l6.2 5.2C41 35.5 44 30.2 44 24c0-1.3-.1-2.7-.4-4z"/></svg>
                   {loading ? "Signing in..." : "Continue with Google"}
                 </button>
+              </div>
+            </div>
+          </Card>
+        )}
+        {/* ROLE SELECTION — first time users only */}
+      {phase === PHASE.ROLE_SELECT && (
+        <div style={{ animation: "fadeUp 0.3s ease forwards" }}>
+          <div style={{ textAlign: "center", marginBottom: "2rem" }}>
+            <h2 style={{ fontFamily: "var(--fd)", fontSize: "1.4rem", color: "#fff", margin: "0 0 0.5rem" }}>
+              Welcome to EasyJob
+            </h2>
+            <p style={{ color: "var(--mu)", fontSize: "0.85rem" }}>
+              Tell us how you want to use EasyJob
+            </p>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+            {/* Seeker card */}
+            <button onClick={() => {
+              setUserRole("seeker");
+              setPhase(PHASE.SETUP_INFO);
+            }} style={{
+              background: "rgba(255,255,255,0.02)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 16, padding: "2rem 1.25rem",
+              cursor: "pointer", textAlign: "center",
+              transition: "all 0.2s", fontFamily: "var(--fb)"
+            }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.borderColor = "var(--a)";
+                e.currentTarget.style.background = "rgba(99,212,170,0.06)";
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
+                e.currentTarget.style.background = "rgba(255,255,255,0.02)";
+              }}>
+              <div style={{ fontSize: "2.5rem", marginBottom: "0.75rem" }}>👤</div>
+              <div style={{ color: "#fff", fontSize: "1rem", fontWeight: 700, fontFamily: "var(--fd)", marginBottom: "0.5rem" }}>
+                I am looking for a job
+              </div>
+              <div style={{ color: "var(--mu)", fontSize: "0.78rem", lineHeight: 1.5 }}>
+                Get matched to real jobs. Tailored resume. AI match score.
+              </div>
+            </button>
+
+            {/* HR card */}
+            <button onClick={() => {
+              setUserRole("hr");
+              setPhase(PHASE.HR_SETUP);
+            }} style={{
+              background: "rgba(255,255,255,0.02)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 16, padding: "2rem 1.25rem",
+              cursor: "pointer", textAlign: "center",
+              transition: "all 0.2s", fontFamily: "var(--fb)"
+            }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.borderColor = "#60a5fa";
+                e.currentTarget.style.background = "rgba(96,165,250,0.06)";
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
+                e.currentTarget.style.background = "rgba(255,255,255,0.02)";
+              }}>
+              <div style={{ fontSize: "2.5rem", marginBottom: "0.75rem" }}>🏢</div>
+              <div style={{ color: "#fff", fontSize: "1rem", fontWeight: 700, fontFamily: "var(--fd)", marginBottom: "0.5rem" }}>
+                I am hiring
+              </div>
+              <div style={{ color: "var(--mu)", fontSize: "0.78rem", lineHeight: 1.5 }}>
+                Review pre-scored candidates. Build your pipeline. Log outcomes.
+              </div>
+            </button>
+          </div>
+        </div>
+      )}
+      {/* HR SETUP — first time HR users */}
+        {phase === PHASE.HR_SETUP && (
+          <Card>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1rem" }}>
+              <div style={{ width: 24, height: 24, borderRadius: "50%", background: "#60a5fa", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.7rem", fontWeight: 800, color: "#0b1120" }}>1</div>
+              <h2 style={{ fontFamily: "var(--fd)", fontSize: "1rem", color: "#fff", margin: 0 }}>Set up your hiring profile</h2>
+            </div>
+
+            <div style={{ marginBottom: "1rem" }}>
+              <label style={{ display: "block", color: "rgba(255,255,255,0.55)", fontSize: "0.72rem", fontWeight: 600, textTransform: "uppercase", marginBottom: "0.35rem" }}>Your Name *</label>
+              <input
+                style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.04)", border: "1px solid var(--br)", borderRadius: 10, padding: "0.75rem", color: "#fff", fontSize: "0.87rem", fontFamily: "var(--fb)", outline: "none" }}
+                placeholder="e.g. Rahul Sharma"
+                value={draftName}
+                onChange={(e) => setDraftName(e.target.value)}
+              />
+            </div>
+
+            <div style={{ marginBottom: "1rem" }}>
+              <label style={{ display: "block", color: "rgba(255,255,255,0.55)", fontSize: "0.72rem", fontWeight: 600, textTransform: "uppercase", marginBottom: "0.35rem" }}>Company / Organisation *</label>
+              <input
+                style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.04)", border: "1px solid var(--br)", borderRadius: 10, padding: "0.75rem", color: "#fff", fontSize: "0.87rem", fontFamily: "var(--fb)", outline: "none" }}
+                placeholder="e.g. Zepto, McKinsey, Independent Recruiter"
+                value={draftCompany}
+                onChange={(e) => setDraftCompany(e.target.value)}
+              />
+            </div>
+
+            <div style={{ marginBottom: "1rem" }}>
+              <label style={{ display: "block", color: "rgba(255,255,255,0.55)", fontSize: "0.72rem", fontWeight: 600, textTransform: "uppercase", marginBottom: "0.35rem" }}>Your Role</label>
+              <select
+                value={draftHrRole}
+                onChange={(e) => setDraftHrRole(e.target.value)}
+                style={{ width: "100%", background: "rgba(255,255,255,0.04)", border: "1px solid var(--br)", borderRadius: 10, padding: "0.75rem", color: "#fff", fontSize: "0.87rem", fontFamily: "var(--fb)", outline: "none" }}>
+                <option value="">Select your role</option>
+                <option value="HR Manager">HR Manager</option>
+                <option value="Talent Acquisition">Talent Acquisition</option>
+                <option value="Recruiter">Recruiter</option>
+                <option value="Founder">Founder</option>
+                <option value="Hiring Manager">Hiring Manager</option>
+                <option value="Independent Recruiter">Independent Recruiter</option>
+              </select>
+            </div>
+
+            <div style={{ marginBottom: "1.25rem" }}>
+              <label style={{ display: "block", color: "rgba(255,255,255,0.55)", fontSize: "0.72rem", fontWeight: 600, textTransform: "uppercase", marginBottom: "0.5rem" }}>Roles you typically hire for</label>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.4rem" }}>
+                {INTEREST_BUCKETS.map((b) => {
+                  const selected = draftBuckets.includes(b.id);
+                  return (
+                    <button key={b.id} onClick={() => setDraftBuckets(prev => selected ? prev.filter(x => x !== b.id) : [...prev, b.id])}
+                      style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.6rem 0.8rem", borderRadius: 10, border: `1px solid ${selected ? "#60a5fa" : "rgba(255,255,255,0.08)"}`, background: selected ? "rgba(96,165,250,0.08)" : "rgba(255,255,255,0.02)", cursor: "pointer", textAlign: "left" }}>
+                      <span style={{ fontSize: "0.9rem" }}>{b.icon}</span>
+                      <span style={{ fontSize: "0.78rem", color: selected ? "#60a5fa" : "rgba(255,255,255,0.7)", fontWeight: selected ? 600 : 400 }}>{b.label}</span>
+                      {selected && <span style={{ marginLeft: "auto", color: "#60a5fa", fontSize: "0.8rem" }}>✓</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <Btn variant="ghost" onClick={() => setPhase(PHASE.ROLE_SELECT)}>← Back</Btn>
+              <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                {loading && <Spinner />}
+                <Btn onClick={saveHrProfile} disabled={loading || !draftName.trim() || !draftCompany.trim()}>
+                  {loading ? "Saving..." : "Go to HR Dashboard →"}
+                </Btn>
               </div>
             </div>
           </Card>
