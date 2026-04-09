@@ -28,10 +28,9 @@ RATE LIMITERS
 */
 const aiLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 10,
+  max: 20,
   standardHeaders: true,
   legacyHeaders: false,
-    validate: { xForwardedForHeader: false },
   message: { error: "Limit reached. Max 10 AI requests per hour during beta." }
 });
 
