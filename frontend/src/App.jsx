@@ -9,240 +9,327 @@ const supabase = createClient(
 
 /* ── tokens ── */
 const T = {
-  bg:      "#FAF7F2",
-  card:    "#FFFFFF",
-  teal:    "#2C4A3E",
-  tealMid: "#3D6B5A",
-  tealLt:  "#E6F0EC",
-  terra:   "#C5603A",
-  terraDk: "#A0391A",
-  terraLt: "#FDF0EA",
-  border:  "#E8E0D5",
-  text:    "#1A1A1A",
-  muted:   "#8B7E75",
+  bg:      "#F0F0F0",
+  card:    "#E3E3E3",
+  cardHi:  "#FFFFFF",
+  charcoal:"#2C2C2E",
+  charMid: "#444446",
+  gold:    "#C9962A",
+  goldLt:  "#F5E6C8",
+  goldDk:  "#9A6F1A",
+  border:  "#D4D4D4",
+  text:    "#1C1C1E",
+  muted:   "#777777",
 };
 
 /* ── api ── */
 async function callClaude(messages, systemPrompt) {
   const res = await fetch(`${API_BASE}/api/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages, system: systemPrompt, max_tokens: 1500 }),
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({ messages, system:systemPrompt, max_tokens:1500 }),
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Server error: ${res.status}`);
-  }
+  if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error||`Server error: ${res.status}`); }
   const data = await res.json();
-  return data.content?.map((b) => b.text || "").join("") || "";
+  return data.content?.map(b=>b.text||"").join("")||"";
 }
 
-async function fetchJobs(role, location = "India") {
+async function fetchJobs(role, location="India") {
   const res = await fetch(`${API_BASE}/api/jobs?role=${encodeURIComponent(role)}&location=${encodeURIComponent(location)}`);
   if (!res.ok) return [];
   const data = await res.json();
-  return data.jobs || [];
+  return data.jobs||[];
 }
 
 function computeMatchScore(resume, job) {
-  if (!resume || !job) return 50;
-  const resumeLower = resume.toLowerCase();
-  const jobText = (job.title + " " + job.description).toLowerCase();
-  const jobWords = jobText.split(/\W+/).filter(w => w.length > 4);
-  const uniqueWords = [...new Set(jobWords)];
-  let matches = 0;
-  for (const word of uniqueWords) { if (resumeLower.includes(word)) matches++; }
-  const score = Math.round((matches / Math.max(uniqueWords.length, 1)) * 100);
-  return Math.min(95, Math.max(30, score));
+  if (!resume||!job) return 50;
+  const r = resume.toLowerCase();
+  const words = [...new Set((job.title+" "+job.description).toLowerCase().split(/\W+/).filter(w=>w.length>4))];
+  const matches = words.filter(w=>r.includes(w)).length;
+  return Math.min(95, Math.max(30, Math.round((matches/Math.max(words.length,1))*100)));
 }
 
-const INTEREST_BUCKETS = [
-  { id: "product",       label: "Product Management",        icon: "🎯" },
-  { id: "consulting",    label: "Consulting & Strategy",     icon: "👔" },
-  { id: "chief-of-staff",label: "Chief of Staff",            icon: "👑" },
-  { id: "fullstack",     label: "Full Stack Developer",      icon: "💻" },
-  { id: "data-analyst",  label: "Business & Data Analyst",   icon: "📊" },
-  { id: "marketing",     label: "Marketing & Growth",        icon: "📈" },
-  { id: "finance",       label: "Finance & Banking",         icon: "🏦" },
-  { id: "operations",    label: "Operations & Program Mgmt", icon: "⚙️" },
-  { id: "social-sector", label: "Social Sector / NGO",       icon: "🌱" },
-  { id: "hr",            label: "Human Resources",           icon: "🤝" },
+/* ── constants ── */
+const BUCKETS = [
+  {id:"product",       label:"Product Management",        icon:"🎯"},
+  {id:"consulting",    label:"Consulting & Strategy",     icon:"👔"},
+  {id:"chief-of-staff",label:"Chief of Staff",            icon:"👑"},
+  {id:"fullstack",     label:"Full Stack Developer",      icon:"💻"},
+  {id:"data-analyst",  label:"Business & Data Analyst",   icon:"📊"},
+  {id:"marketing",     label:"Marketing & Growth",        icon:"📈"},
+  {id:"finance",       label:"Finance & Banking",         icon:"🏦"},
+  {id:"operations",    label:"Operations & Program Mgmt", icon:"⚙️"},
+  {id:"social-sector", label:"Social Sector / NGO",       icon:"🌱"},
+  {id:"hr",            label:"Human Resources",           icon:"🤝"},
 ];
 
-const BUCKET_SEARCH_TERMS = {
-  "product": "Product Manager", "consulting": "Strategy Consultant",
-  "chief-of-staff": "Chief of Staff", "fullstack": "Full Stack Developer",
-  "data-analyst": "Business Analyst", "marketing": "Marketing Manager",
-  "finance": "Finance Analyst", "operations": "Operations Manager",
-  "social-sector": "Program Manager NGO", "hr": "HR Manager",
+const BUCKET_TERMS = {
+  "product":"Product Manager","consulting":"Strategy Consultant",
+  "chief-of-staff":"Chief of Staff","fullstack":"Full Stack Developer",
+  "data-analyst":"Business Analyst","marketing":"Marketing Manager",
+  "finance":"Finance Analyst","operations":"Operations Manager",
+  "social-sector":"Program Manager NGO","hr":"HR Manager",
 };
 
-const PHASE = {
-  LOADING:"loading", AUTH:"auth", ROLE_SELECT:"role_select",
-  SETUP_INFO:"setup_info", SETUP_BUCKETS:"setup_buckets",
-  HR_SETUP:"hr_setup", HOME:"home",
-  JD:"jd", SKILLS:"skills", REC:"rec", RESUME:"resume", ATS:"ats", CL:"cl", HR:"hr"
+const INDUSTRIES = ["Technology","Finance & Banking","Consulting","Healthcare",
+  "E-commerce","Manufacturing","Education","Media & Entertainment","Real Estate","Other"];
+
+const CO_SIZES = ["1–10 (Startup)","11–50","51–200","201–500","501–2000","2000+ (Enterprise)"];
+
+const JOB_TYPES = ["Full-time","Part-time","Contract","Freelance","Internship"];
+
+/* ── phases ── */
+const PH = {
+  AUTH:"auth",
+  CAND_PROFILE:"cand_profile", CAND_BUCKETS:"cand_buckets", HOME:"home",
+  JD:"jd", SKILLS:"skills", REC:"rec", RESUME:"resume", ATS:"ats", CL:"cl",
+  CO_PROFILE:"co_profile", CO_HOME:"co_home", CO_POST:"co_post",
+  CO_PIPELINE:"co_pipeline", CO_CANDIDATE:"co_candidate",
 };
 
+/* ── prompts ── */
 const P = {
-  jdAnalysis: (jd) => ({
-    sys: `You are a senior talent acquisition specialist. Extract the most critical skills from job descriptions.`,
-    msg: `Analyze this job description and extract 7-9 most critical skills.\n\nJob Description: ${jd}\n\nRespond ONLY in valid JSON, no markdown:\n{\n  "jobTitle": "exact job title",\n  "company": "company name or Unknown",\n  "seniorityLevel": "Junior/Mid/Senior/Lead/Director",\n  "skills": ["Skill 1", "Skill 2"],\n  "roleType": "technical/business/creative/hybrid",\n  "topPriority": "single most important skill"\n}`,
+  jd: (jd) => ({
+    sys:`You are a senior talent acquisition specialist.`,
+    msg:`Extract 7-9 critical skills from this JD.\n\n${jd}\n\nJSON only:\n{"jobTitle":"","company":"","seniorityLevel":"","skills":[],"roleType":"","topPriority":""}`,
   }),
-  recommendation: (jd, m, skillSummary) => ({
-    sys: `You are a candid career coach for the global job market. Use positive, encouraging language throughout. Rephrase any negative observations as growth opportunities.`,
-    msg: `Evaluate candidate fit for ${m.jobTitle} at ${m.company}.\n\nJD: ${jd.substring(0, 900)}\nSKILLS: ${skillSummary}\n\n## Verdict\nApply with Confidence | Apply Strategically | Build These Skills First\n2-sentence bottom-line.\n\n## Match Score\nX/100 — 1-sentence explanation.\n\n## Strongest Assets\n3 specific strengths for THIS role.\n\n## Skills to Strengthen\n3 growth areas — frame each as an opportunity to develop.\n\n## Action Plan\n2-3 specific steps to move forward.`,
+  rec: (jd,m,s) => ({
+    sys:`Career coach. Positive, encouraging language. Frame gaps as growth opportunities.`,
+    msg:`Fit for ${m.jobTitle} at ${m.company}.\nJD:${jd.substring(0,900)}\nSKILLS:${s}\n\n## Verdict\nApply with Confidence|Apply Strategically|Build These Skills First\n\n## Match Score\nX/100\n\n## Strongest Assets\n3 strengths.\n\n## Skills to Strengthen\n3 growth areas.\n\n## Action Plan\n2-3 steps.`,
   }),
-  resumeTailor: (jd, m, background, skillSummary) => ({
-    sys: `You are a FAANG-level resume strategist. ATS optimization, achievement-driven, honest.`,
-    msg: `Create a fully tailored ATS-optimized resume.\n\nTARGET: ${m.jobTitle} at ${m.company}\nJD: ${jd.substring(0, 800)}\nBACKGROUND: ${background}\nSKILLS: ${skillSummary}\n\nOpen with 3-sentence Professional Summary. Use ## for sections. Tailor every bullet to JD language.`,
+  resume: (jd,m,bg,s) => ({
+    sys:`FAANG resume strategist. ATS-optimized, achievement-driven.`,
+    msg:`Tailored resume for ${m.jobTitle} at ${m.company}.\nJD:${jd.substring(0,800)}\nBG:${bg}\nSKILLS:${s}\n\n3-sentence Professional Summary. ## for sections.`,
   }),
-  atsReview: (jd, m, resume) => ({
-    sys: `You play TWO roles: ATS SYSTEM (keyword scanner) and HIRING MANAGER (7-second scan). Use positive framing throughout — present every finding as an opportunity to strengthen the application.`,
-    msg: `Review for ${m.jobTitle} at ${m.company}.\nJD: ${jd.substring(0, 600)}\nRESUME: ${resume.substring(0, 1000)}\n\n## ATS Score: X/100\n## Keywords to Add\n## Hiring Manager Impression\n## Top 5 Ways to Strengthen\n## Shortlist Probability A/B/C/D`,
+  ats: (jd,m,r) => ({
+    sys:`ATS system + hiring manager. Frame findings as opportunities.`,
+    msg:`Review for ${m.jobTitle} at ${m.company}.\nJD:${jd.substring(0,600)}\nRESUME:${r.substring(0,1000)}\n\n## ATS Score: X/100\n## Keywords to Add\n## Hiring Manager Impression\n## Top 5 Improvements\n## Shortlist Probability`,
   }),
-  coverLetter: (jd, m, resume, rec) => ({
-    sys: `Write exceptional cover letters. Hook → Why You → Why Them → Close. Use active, confident language throughout. Never use "I am excited to apply."`,
-    msg: `Cover letter for ${m.jobTitle} at ${m.company}.\nJD: ${jd.substring(0, 700)}\nRESUME: ${resume.substring(0, 800)}\n~280 words. [Your Name] placeholder.`,
+  cl: (jd,m,r) => ({
+    sys:`Cover letter writer. Hook→Why You→Why Them→Close. Confident, active. Never "I am excited to apply."`,
+    msg:`Cover letter for ${m.jobTitle} at ${m.company}.\nJD:${jd.substring(0,700)}\nRESUME:${r.substring(0,800)}\n~280 words. [Your Name] placeholder.`,
   }),
 };
 
-/* ── primitives ── */
+/* ══════════════════════════
+   PRIMITIVES
+══════════════════════════ */
 function Spinner() {
   return (
-    <div style={{ display:"flex", gap:5, alignItems:"center", justifyContent:"center" }}>
-      {[0,1,2].map(i => (
-        <span key={i} style={{ width:7, height:7, borderRadius:"50%", background:T.teal, display:"block", animation:`pulse 1.1s ease ${i*0.18}s infinite` }} />
+    <div style={{display:"flex",gap:5,alignItems:"center",justifyContent:"center"}}>
+      {[0,1,2].map(i=>(
+        <span key={i} style={{width:7,height:7,borderRadius:"50%",background:T.charcoal,display:"block",animation:`pulse 1.1s ease ${i*0.18}s infinite`}}/>
       ))}
     </div>
   );
 }
 
-function Btn({ children, onClick, disabled, variant="primary", small }) {
+function Btn({children,onClick,disabled,variant="primary",small,full}) {
+  const [hover,setHover] = useState(false);
+  const [active,setActive] = useState(false);
   const base = {
-    border:"none", borderRadius:8, cursor:disabled?"not-allowed":"pointer",
-    fontWeight:600, fontFamily:"'DM Sans',sans-serif", transition:"all 0.15s",
-    opacity:disabled?0.5:1, padding:small?"0.45rem 1rem":"0.75rem 1.5rem",
+    border:"none", borderRadius:10, cursor:disabled?"not-allowed":"pointer",
+    fontWeight:600, fontFamily:"'DM Sans',sans-serif",
+    opacity:disabled?0.45:1,
+    padding:small?"0.45rem 1rem":"0.75rem 1.5rem",
     fontSize:small?"0.78rem":"0.87rem",
+    width:full?"100%":"auto",
+    transition:"transform 0.15s, box-shadow 0.15s, background 0.15s",
+    transform:active?"scale(0.97)":hover?"scale(1.02)":"scale(1)",
+    boxShadow:hover&&!disabled?"0 4px 12px rgba(0,0,0,0.15)":"0 2px 4px rgba(0,0,0,0.08)",
+    display:"inline-flex", alignItems:"center", justifyContent:"center", gap:6,
   };
-  if (variant === "primary") return (
-    <button style={{ ...base, background:T.teal, color:"#fff" }} onClick={onClick} disabled={disabled}>{children}</button>
-  );
-  if (variant === "terra") return (
-    <button style={{ ...base, background:T.terra, color:"#fff" }} onClick={onClick} disabled={disabled}>{children}</button>
-  );
-  if (variant === "secondary") return (
-    <button style={{ ...base, background:T.tealLt, color:T.teal, border:`1px solid ${T.border}` }} onClick={onClick} disabled={disabled}>{children}</button>
-  );
-  if (variant === "danger") return (
-    <button style={{ ...base, background:T.terraLt, color:T.terraDk, border:`1px solid ${T.terra}` }} onClick={onClick} disabled={disabled}>{children}</button>
+  const styles = {
+    primary:  {...base, background:T.charcoal, color:"#fff"},
+    gold:     {...base, background:T.gold,     color:"#fff", boxShadow:hover?"0 4px 12px rgba(201,150,42,0.4)":"0 2px 4px rgba(201,150,42,0.2)"},
+    secondary:{...base, background:T.cardHi,  color:T.charcoal, border:`1px solid ${T.border}`},
+    ghost:    {...base, background:"transparent", color:T.muted, border:`1px solid ${T.border}`},
+  };
+  return (
+    <button
+      style={styles[variant]||styles.primary}
+      onClick={onClick} disabled={disabled}
+      onMouseEnter={()=>setHover(true)} onMouseLeave={()=>{setHover(false);setActive(false);}}
+      onMouseDown={()=>setActive(true)} onMouseUp={()=>setActive(false)}>
+      {children}
+    </button>
   );
 }
 
-function Card({ children, style: sx }) {
+function Card({children,style:sx,animate,delay=0}) {
   return (
-    <div style={{ background:T.card, border:`1px solid ${T.border}`, borderRadius:16, padding:"1.5rem", animation:"fadeUp 0.3s ease forwards", ...sx }}>
+    <div style={{
+      background:T.cardHi, border:`1px solid ${T.border}`, borderRadius:16,
+      padding:"1.5rem",
+      animation:animate!==false?`fadeUp 0.35s ease ${delay}s both`:"none",
+      transition:"box-shadow 0.2s, transform 0.2s",
+      ...sx,
+    }}
+    onMouseEnter={e=>{e.currentTarget.style.boxShadow="0 8px 24px rgba(0,0,0,0.1)";e.currentTarget.style.transform="translateY(-2px)";}}
+    onMouseLeave={e=>{e.currentTarget.style.boxShadow="none";e.currentTarget.style.transform="translateY(0)";}}>
       {children}
     </div>
   );
 }
 
-function TA({ value, onChange, placeholder, rows=8 }) {
+function SurfaceCard({children,style:sx,delay=0}) {
   return (
-    <textarea style={{ width:"100%", boxSizing:"border-box", background:T.card, border:`1px solid ${T.border}`, borderRadius:10, padding:"0.85rem", color:T.text, fontSize:"0.87rem", fontFamily:"'DM Sans',sans-serif", lineHeight:1.65, resize:"vertical", outline:"none", minHeight:`${rows*22}px` }}
-      placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} />
+    <div style={{
+      background:T.card, border:`1px solid ${T.border}`, borderRadius:12,
+      padding:"1rem", animation:`fadeUp 0.35s ease ${delay}s both`, ...sx,
+    }}>
+      {children}
+    </div>
   );
 }
 
-function MD({ text }) {
+function Input({label,value,onChange,placeholder,type="text",optional}) {
+  const [focus,setFocus] = useState(false);
+  return (
+    <div style={{marginBottom:"1rem"}}>
+      <label style={{display:"flex",alignItems:"center",gap:6,color:T.muted,fontSize:"0.72rem",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"0.35rem"}}>
+        {label}{optional&&<span style={{fontSize:"0.65rem",fontWeight:400,textTransform:"none",letterSpacing:0}}>— optional</span>}
+      </label>
+      <input type={type} placeholder={placeholder} value={value} onChange={e=>onChange(e.target.value)}
+        onFocus={()=>setFocus(true)} onBlur={()=>setFocus(false)}
+        style={{width:"100%",boxSizing:"border-box",background:T.cardHi,border:`1.5px solid ${focus?T.charcoal:T.border}`,borderRadius:10,padding:"0.75rem",color:T.text,fontSize:"0.87rem",outline:"none",transition:"border-color 0.15s, box-shadow 0.15s",boxShadow:focus?`0 0 0 3px rgba(44,44,46,0.08)`:"none"}}/>
+    </div>
+  );
+}
+
+function Select({label,value,onChange,options,placeholder}) {
+  return (
+    <div style={{marginBottom:"1rem"}}>
+      <label style={{display:"block",color:T.muted,fontSize:"0.72rem",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"0.35rem"}}>{label}</label>
+      <select value={value} onChange={e=>onChange(e.target.value)}
+        style={{width:"100%",boxSizing:"border-box",background:T.cardHi,border:`1.5px solid ${T.border}`,borderRadius:10,padding:"0.75rem",color:value?T.text:T.muted,fontSize:"0.87rem",outline:"none"}}>
+        <option value="">{placeholder}</option>
+        {options.map(o=><option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
+  );
+}
+
+function TA({label,value,onChange,placeholder,rows=8,optional}) {
+  const [focus,setFocus] = useState(false);
+  return (
+    <div style={{marginBottom:"1rem"}}>
+      {label&&<label style={{display:"flex",alignItems:"center",gap:6,color:T.muted,fontSize:"0.72rem",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"0.35rem"}}>
+        {label}{optional&&<span style={{fontSize:"0.65rem",fontWeight:400,textTransform:"none",letterSpacing:0}}>— optional</span>}
+      </label>}
+      <textarea placeholder={placeholder} value={value} onChange={e=>onChange(e.target.value)}
+        onFocus={()=>setFocus(true)} onBlur={()=>setFocus(false)}
+        style={{width:"100%",boxSizing:"border-box",background:T.cardHi,border:`1.5px solid ${focus?T.charcoal:T.border}`,borderRadius:10,padding:"0.85rem",color:T.text,fontSize:"0.87rem",lineHeight:1.65,resize:"vertical",outline:"none",minHeight:`${rows*22}px`,transition:"border-color 0.15s"}}/>
+    </div>
+  );
+}
+
+function StepBadge({n}) {
+  return <div style={{width:26,height:26,borderRadius:"50%",background:T.charcoal,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"0.7rem",fontWeight:800,color:"#fff",flexShrink:0}}>{n}</div>;
+}
+
+function SectionHeader({step,total,title}) {
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:"0.5rem",marginBottom:"1.25rem"}}>
+      <StepBadge n={step}/>
+      <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"1rem",color:T.charcoal,margin:0}}>{title}</h2>
+      {total&&<span style={{color:T.muted,fontSize:"0.75rem"}}>Step {step} of {total}</span>}
+    </div>
+  );
+}
+
+function MD({text}) {
   if (!text) return null;
   const html = text
     .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
     .replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>")
-    .replace(/^## (.+)$/gm,`<h2 style="color:${T.teal};font-size:0.95rem;margin:1rem 0 0.25rem;font-weight:600">$1</h2>`)
-    .replace(/^### (.+)$/gm,`<h3 style="color:${T.terra};font-size:0.75rem;text-transform:uppercase;letter-spacing:0.07em;margin:0.8rem 0 0.2rem">$1</h3>`)
-    .replace(/^\d+\. (.+)$/gm,`<div style="display:flex;gap:8px;margin:4px 0;padding:6px 10px;background:${T.tealLt};border-radius:6px;border-left:2px solid ${T.teal}"><span>$1</span></div>`)
-    .replace(/^- (.+)$/gm,`<div style="display:flex;gap:8px;margin:3px 0"><span style="color:${T.terra}">▸</span><span>$1</span></div>`)
+    .replace(/^## (.+)$/gm,`<h2 style="color:${T.charcoal};font-size:0.95rem;margin:1rem 0 0.3rem;font-weight:600">$1</h2>`)
+    .replace(/^### (.+)$/gm,`<h3 style="color:${T.gold};font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em;margin:0.8rem 0 0.2rem">$1</h3>`)
+    .replace(/^\d+\. (.+)$/gm,`<div style="display:flex;gap:8px;margin:4px 0;padding:7px 10px;background:${T.card};border-radius:8px;border-left:2px solid ${T.charcoal}"><span>$1</span></div>`)
+    .replace(/^- (.+)$/gm,`<div style="display:flex;gap:8px;margin:3px 0"><span style="color:${T.gold}">▸</span><span>$1</span></div>`)
     .replace(/\n\n/g,"<br/><br/>").replace(/\n/g,"<br/>");
-  return <div style={{ color:T.text, lineHeight:1.7, fontSize:"0.86rem" }} dangerouslySetInnerHTML={{ __html:html }} />;
+  return <div style={{color:T.text,lineHeight:1.7,fontSize:"0.86rem"}} dangerouslySetInnerHTML={{__html:html}}/>;
 }
 
-function PreBox({ text }) {
-  return (
-    <pre style={{ whiteSpace:"pre-wrap", wordBreak:"break-word", fontFamily:"monospace", fontSize:"0.77rem", lineHeight:1.75, color:T.text, background:T.bg, border:`1px solid ${T.border}`, borderRadius:12, padding:"1.25rem", maxHeight:380, overflowY:"auto", margin:0 }}>
-      {text}
-    </pre>
-  );
+function PreBox({text}) {
+  return <pre style={{whiteSpace:"pre-wrap",wordBreak:"break-word",fontFamily:"monospace",fontSize:"0.77rem",lineHeight:1.75,color:T.text,background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:"1.25rem",maxHeight:380,overflowY:"auto",margin:0}}>{text}</pre>;
 }
 
-function SkillRow({ skill, rating, onChange, isTop }) {
-  const lbl = ["","Building","Learning","Proficient","Advanced","Expert"];
-  const clr = [,T.terra,T.terra,T.tealMid,T.teal,T.teal];
+function SkillRow({skill,rating,onChange,isTop}) {
+  const lbl=["","Building","Learning","Proficient","Advanced","Expert"];
+  const clr=[,T.muted,T.muted,T.charMid,T.charcoal,T.charcoal];
   return (
-    <div style={{ display:"flex", alignItems:"center", gap:"1rem", flexWrap:"wrap", padding:"0.7rem 1rem", borderRadius:10, marginBottom:"0.4rem", background:rating?T.tealLt:T.bg, border:`1px solid ${rating?T.teal:T.border}` }}>
-      <div style={{ flex:1, display:"flex", alignItems:"center", gap:"0.4rem", minWidth:120 }}>
-        {isTop && <span style={{ fontSize:"0.65rem", color:T.terra }}>★</span>}
-        <span style={{ color:T.text, fontSize:"0.85rem" }}>{skill}</span>
+    <div style={{display:"flex",alignItems:"center",gap:"1rem",flexWrap:"wrap",padding:"0.7rem 1rem",borderRadius:10,marginBottom:"0.4rem",background:rating?T.goldLt:T.card,border:`1px solid ${rating?T.gold:T.border}`,transition:"all 0.2s"}}>
+      <div style={{flex:1,display:"flex",alignItems:"center",gap:"0.4rem",minWidth:120}}>
+        {isTop&&<span style={{fontSize:"0.65rem",color:T.gold}}>★</span>}
+        <span style={{color:T.text,fontSize:"0.85rem"}}>{skill}</span>
       </div>
-      <div style={{ display:"flex", gap:4 }}>
-        {[1,2,3,4,5].map(n => (
-          <button key={n} onClick={() => onChange(n)} style={{ width:30, height:30, borderRadius:7, border:"none", cursor:"pointer", background:rating>=n?clr[n]:T.bg, color:rating>=n?"#fff":T.muted, fontWeight:700, fontSize:"0.77rem", border:`1px solid ${rating>=n?clr[n]:T.border}` }}>{n}</button>
+      <div style={{display:"flex",gap:4,alignItems:"center"}}>
+        {[1,2,3,4,5].map(n=>(
+          <button key={n} onClick={()=>onChange(n)}
+            style={{width:30,height:30,borderRadius:7,border:`1px solid ${rating>=n?clr[n]:T.border}`,cursor:"pointer",background:rating>=n?clr[n]:T.cardHi,color:rating>=n?"#fff":T.muted,fontWeight:700,fontSize:"0.77rem",transition:"all 0.15s",transform:"scale(1)",}}
+            onMouseEnter={e=>e.currentTarget.style.transform="scale(1.1)"}
+            onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}>{n}</button>
         ))}
-        {rating > 0 && <span style={{ fontSize:"0.67rem", color:clr[rating], fontWeight:600, minWidth:60, marginLeft:4 }}>{lbl[rating]}</span>}
+        {rating>0&&<span style={{fontSize:"0.67rem",color:clr[rating],fontWeight:600,minWidth:60,marginLeft:4}}>{lbl[rating]}</span>}
       </div>
     </div>
   );
 }
 
-function ScoreBadge({ score }) {
-  const col = score >= 75 ? T.teal : score >= 55 ? T.terra : T.muted;
+function ScoreBadge({score}) {
+  const col=score>=75?T.charcoal:score>=55?T.gold:T.muted;
   return (
-    <div style={{ width:52, height:52, borderRadius:"50%", border:`3px solid ${col}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, background:T.bg }}>
-      <span style={{ fontSize:"0.85rem", fontWeight:800, color:col }}>{score}%</span>
+    <div style={{width:52,height:52,borderRadius:"50%",border:`3px solid ${col}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,background:T.cardHi,animation:score>=75?"goldPulse 2s infinite":"none"}}>
+      <span style={{fontSize:"0.82rem",fontWeight:800,color:col}}>{score}%</span>
     </div>
   );
 }
 
-function ScoreDial({ score }) {
-  const r=36, c=2*Math.PI*r, pct=Math.min(100,Math.max(0,score));
-  const col = pct>=75?T.teal:pct>=55?T.terra:T.muted;
+function ScoreDial({score}) {
+  const r=36,c=2*Math.PI*r,pct=Math.min(100,Math.max(0,score));
+  const col=pct>=75?T.charcoal:pct>=55?T.gold:T.muted;
   return (
-    <div style={{ position:"relative", width:88, height:88, flexShrink:0 }}>
-      <svg width="88" height="88" viewBox="0 0 88 88" style={{ transform:"rotate(-90deg)" }}>
-        <circle cx="44" cy="44" r={r} fill="none" stroke={T.border} strokeWidth="8" />
-        <circle cx="44" cy="44" r={r} fill="none" stroke={col} strokeWidth="8" strokeLinecap="round" strokeDasharray={`${(pct/100)*c} ${c}`} />
+    <div style={{position:"relative",width:88,height:88,flexShrink:0}}>
+      <svg width="88" height="88" viewBox="0 0 88 88" style={{transform:"rotate(-90deg)"}}>
+        <circle cx="44" cy="44" r={r} fill="none" stroke={T.border} strokeWidth="8"/>
+        <circle cx="44" cy="44" r={r} fill="none" stroke={col} strokeWidth="8" strokeLinecap="round" strokeDasharray={`${(pct/100)*c} ${c}`} style={{transition:"stroke-dasharray 0.8s ease"}}/>
       </svg>
-      <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
-        <span style={{ fontSize:"1.3rem", fontWeight:800, color:T.text, lineHeight:1 }}>{pct}</span>
-        <span style={{ fontSize:"0.55rem", color:T.muted }}>/100</span>
+      <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+        <span style={{fontSize:"1.3rem",fontWeight:800,color:T.text,lineHeight:1}}>{pct}</span>
+        <span style={{fontSize:"0.55rem",color:T.muted}}>/100</span>
       </div>
     </div>
   );
 }
 
-const FLOW_STEPS = [
-  { key:"jd",     label:"Job",    icon:"01" },
-  { key:"skills", label:"Skills", icon:"02" },
-  { key:"rec",    label:"Match",  icon:"03" },
-  { key:"resume", label:"Resume", icon:"04" },
-  { key:"ats",    label:"ATS",    icon:"05" },
-  { key:"cl",     label:"Cover",  icon:"06" },
+function GoldTag({children}) {
+  return <span style={{background:T.goldLt,color:T.goldDk,fontSize:"0.7rem",fontWeight:600,padding:"3px 10px",borderRadius:20,border:`1px solid ${T.gold}`}}>{children}</span>;
+}
+
+function DarkTag({children}) {
+  return <span style={{background:T.charcoal,color:"#fff",fontSize:"0.7rem",fontWeight:600,padding:"3px 10px",borderRadius:20}}>{children}</span>;
+}
+
+const FLOW_STEPS=[
+  {key:"jd",label:"Job",icon:"01"},{key:"skills",label:"Skills",icon:"02"},
+  {key:"rec",label:"Match",icon:"03"},{key:"resume",label:"Resume",icon:"04"},
+  {key:"ats",label:"ATS",icon:"05"},{key:"cl",label:"Cover",icon:"06"},
 ];
 
-function FlowStepper({ current }) {
-  const idx = FLOW_STEPS.findIndex(s => s.key === current);
+function FlowStepper({current}) {
+  const idx=FLOW_STEPS.findIndex(s=>s.key===current);
   return (
-    <div style={{ display:"flex", marginBottom:"1.5rem" }}>
-      {FLOW_STEPS.map((s,i) => {
-        const done=i<idx, active=i===idx;
+    <div style={{display:"flex",marginBottom:"1.5rem"}}>
+      {FLOW_STEPS.map((s,i)=>{
+        const done=i<idx,active=i===idx;
         return (
-          <div key={s.key} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center" }}>
-            <div style={{ position:"relative", width:"100%", display:"flex", alignItems:"center" }}>
-              {i>0 && <div style={{ flex:1, height:2, background:done?T.teal:T.border }} />}
-              <div style={{ width:26, height:26, borderRadius:"50%", flexShrink:0, background:done?T.teal:active?T.tealLt:T.bg, border:`2px solid ${done?T.teal:active?T.teal:T.border}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"0.6rem", fontWeight:800, color:done?"#fff":active?T.teal:T.muted }}>{done?"✓":s.icon}</div>
-              {i<FLOW_STEPS.length-1 && <div style={{ flex:1, height:2, background:done?T.teal:T.border }} />}
+          <div key={s.key} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center"}}>
+            <div style={{position:"relative",width:"100%",display:"flex",alignItems:"center"}}>
+              {i>0&&<div style={{flex:1,height:2,background:done?T.charcoal:T.border,transition:"background 0.3s"}}/>}
+              <div style={{width:26,height:26,borderRadius:"50%",flexShrink:0,background:done?T.charcoal:active?T.goldLt:T.card,border:`2px solid ${done?T.charcoal:active?T.gold:T.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"0.6rem",fontWeight:800,color:done?"#fff":active?T.gold:T.muted,transition:"all 0.3s"}}>{done?"✓":s.icon}</div>
+              {i<FLOW_STEPS.length-1&&<div style={{flex:1,height:2,background:done?T.charcoal:T.border,transition:"background 0.3s"}}/>}
             </div>
-            <span style={{ fontSize:"0.5rem", marginTop:"0.25rem", textTransform:"uppercase", textAlign:"center", color:active?T.teal:done?T.tealMid:T.muted, fontWeight:active?700:400 }}>{s.label}</span>
+            <span style={{fontSize:"0.5rem",marginTop:"0.25rem",textTransform:"uppercase",textAlign:"center",color:active?T.gold:done?T.charcoal:T.muted,fontWeight:active?700:400}}>{s.label}</span>
           </div>
         );
       })}
@@ -250,536 +337,587 @@ function FlowStepper({ current }) {
   );
 }
 
-/* ── main app ── */
-export default function App() {
-  const [phase, setPhase] = useState(PHASE.LOADING);
-  const [user, setUser] = useState(null);
-  const [userRole, setUserRole] = useState("seeker");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [profile, setProfile] = useState(null);
-  const [draftName, setDraftName] = useState("");
-  const [draftBG, setDraftBG] = useState("");
-  const [draftBuckets, setDraftBuckets] = useState([]);
-  const [draftCompany, setDraftCompany] = useState("");
-  const [draftHrRole, setDraftHrRole] = useState("");
-  const [jobs, setJobs] = useState([]);
-  const [jobsLoading, setJobsLoading] = useState(false);
-  const [selectedJob, setSelectedJob] = useState(null);
-  const [jd, setJd] = useState("");
-  const [meta, setMeta] = useState({ jobTitle:"", company:"", seniority:"", roleType:"", topPriority:"" });
-  const [skills, setSkills] = useState([]);
-  const [ratings, setRatings] = useState({});
-  const [recommendation, setRec] = useState("");
-  const [resume, setResume] = useState("");
-  const [atsReview, setAtsReview] = useState("");
-  const [atsScore, setAtsScore] = useState(null);
-  const [coverLetter, setCL] = useState("");
-  const [candidates, setCandidates] = useState([]);
-  const [selectedCandidate, setSelectedCandidate] = useState(null);
-  const [emailInput, setEmailInput] = useState("");
-  const [passwordInput, setPasswordInput] = useState("");
-  const [authMode, setAuthMode] = useState("signin");
-  const bottomRef = useRef(null);
+function JobCard({job,onAnalyse,delay=0}) {
+  const [hover,setHover]=useState(false);
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:"1rem",padding:"0.9rem 1rem",border:`1px solid ${hover?T.charcoal:T.border}`,borderRadius:12,marginBottom:"0.5rem",background:T.cardHi,transition:"all 0.2s",transform:hover?"translateX(4px)":"translateX(0)",animation:`slideRight 0.3s ease ${delay}s both`,cursor:"pointer"}}
+      onMouseEnter={()=>setHover(true)} onMouseLeave={()=>setHover(false)}>
+      <ScoreBadge score={job.matchScore}/>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{color:T.text,fontSize:"0.88rem",fontWeight:600,marginBottom:"0.15rem",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{job.title}</div>
+        <div style={{color:T.muted,fontSize:"0.75rem"}}>{job.company} · {job.location}</div>
+        <div style={{marginTop:"0.3rem"}}><GoldTag>{job.bucketLabel}</GoldTag></div>
+      </div>
+      <Btn small onClick={()=>onAnalyse(job)}>Analyse →</Btn>
+    </div>
+  );
+}
 
-  async function loadUserProfile(userId) {
+function CandidateRow({c,onClick,rank,delay=0}) {
+  const [hover,setHover]=useState(false);
+  const score=c.match_score||0;
+  const col=score>=75?T.charcoal:score>=55?T.gold:T.muted;
+  return (
+    <div onClick={onClick} style={{display:"flex",alignItems:"center",gap:"1rem",padding:"0.8rem 0.9rem",border:`1px solid ${hover?T.charcoal:T.border}`,borderRadius:12,marginBottom:"0.5rem",cursor:"pointer",background:T.cardHi,transition:"all 0.2s",transform:hover?"translateX(4px)":"translateX(0)",animation:`slideRight 0.3s ease ${delay}s both`}}
+      onMouseEnter={()=>setHover(true)} onMouseLeave={()=>setHover(false)}>
+      {rank!==undefined&&<div style={{width:22,height:22,borderRadius:"50%",background:rank<3?T.charcoal:T.card,border:`1px solid ${T.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"0.65rem",fontWeight:700,color:rank<3?"#fff":T.muted,flexShrink:0}}>{rank+1}</div>}
+      <div style={{width:36,height:36,borderRadius:"50%",background:T.card,display:"flex",alignItems:"center",justifyContent:"center",color:T.charcoal,fontWeight:700,flexShrink:0,fontSize:"0.9rem"}}>
+        {(c.users?.full_name||c.users?.email||"?")[0].toUpperCase()}
+      </div>
+      <div style={{flex:1}}>
+        <p style={{fontSize:"0.86rem",fontWeight:600,color:T.text,margin:"0 0 2px"}}>{c.users?.full_name||c.users?.email||"Anonymous"}</p>
+        <p style={{fontSize:"0.73rem",color:T.muted,margin:0}}>{c.role_target}</p>
+      </div>
+      <div style={{textAlign:"right"}}>
+        <p style={{fontFamily:"'Syne',sans-serif",fontSize:"1.1rem",fontWeight:800,color:col,margin:0}}>{score||"—"}</p>
+        <p style={{fontSize:"0.62rem",color:T.muted,margin:0}}>score</p>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════
+   MAIN APP
+══════════════════════════ */
+export default function App() {
+  const [phase,setPhase]   = useState(PH.AUTH);
+  const [user,setUser]     = useState(null);
+  const [loading,setLoad]  = useState(false);
+  const [error,setError]   = useState("");
+  const [authMode,setAuthMode]       = useState("signin");
+  const [authPersona,setAuthPersona] = useState("candidate");
+  const [email,setEmail]     = useState("");
+  const [password,setPassword] = useState("");
+
+  /* candidate */
+  const [candProfile,setCandProfile] = useState(null);
+  const [dName,setDName]   = useState("");
+  const [dBG,setDBG]       = useState("");
+  const [dSkills,setDSkills]   = useState("");
+  const [dLoc,setDLoc]     = useState("");
+  const [dSalary,setDSalary]   = useState("");
+  const [dBuckets,setDBuckets] = useState([]);
+  const [jobs,setJobs]     = useState([]);
+  const [jobsLoading,setJobsLoading] = useState(false);
+  const [selJob,setSelJob] = useState(null);
+  const [jd,setJd]         = useState("");
+  const [meta,setMeta]     = useState({jobTitle:"",company:"",seniority:"",roleType:"",topPriority:""});
+  const [skills,setSkills] = useState([]);
+  const [ratings,setRatings] = useState({});
+  const [rec,setRec]       = useState("");
+  const [resume,setResume] = useState("");
+  const [atsReview,setAtsReview] = useState("");
+  const [atsScore,setAtsScore]   = useState(null);
+  const [cl,setCl]         = useState("");
+
+  /* company */
+  const [coProfile,setCoProfile]   = useState(null);
+  const [coName,setCoName]         = useState("");
+  const [coIndustry,setCoIndustry] = useState("");
+  const [coSize,setCoSize]         = useState("");
+  const [coWebsite,setCoWebsite]   = useState("");
+  const [coContact,setCoContact]   = useState("");
+  const [coJobs,setCoJobs]         = useState([]);
+  const [candidates,setCandidates] = useState([]);
+  const [selCand,setSelCand]       = useState(null);
+  const [selCoJob,setSelCoJob]     = useState(null);
+  const [jpTitle,setJpTitle]   = useState("");
+  const [jpJD,setJpJD]         = useState("");
+  const [jpLoc,setJpLoc]       = useState("");
+  const [jpType,setJpType]     = useState("");
+  const [jpSalary,setJpSalary] = useState("");
+  const [jpDeadline,setJpDeadline] = useState("");
+
+  const bottomRef = useRef(null);
+  useEffect(()=>{ bottomRef.current?.scrollIntoView({behavior:"smooth"}); },[phase,loading]);
+
+  useEffect(()=>{
+    supabase.auth.getSession().then(({data:{session}})=>{
+      if (session?.user) { setUser(session.user); loadProfile(session.user); }
+    });
+    const {data:{subscription}} = supabase.auth.onAuthStateChange((_e,session)=>{
+      if (session?.user) { setUser(session.user); loadProfile(session.user); }
+      else { setUser(null); setPhase(PH.AUTH); }
+    });
+    return ()=>subscription.unsubscribe();
+  },[]);
+
+  useEffect(()=>{
+    if (phase===PH.HOME && candProfile?.buckets?.length>0) loadJobs(candProfile);
+  },[phase,candProfile]);
+
+  async function loadProfile(u) {
     try {
-      const { data } = await supabase.from("users").select("*").eq("id", userId).maybeSingle();
-      if (data) {
-        setProfile(data);
-        if (data.user_role === "hr") { setUserRole("hr"); setPhase(PHASE.HR); loadCandidates(); }
-        else { setUserRole("seeker"); setPhase(PHASE.HOME); }
-      } else { setPhase(PHASE.ROLE_SELECT); }
-    } catch { setPhase(PHASE.ROLE_SELECT); }
+      const {data} = await supabase.from("users").select("*").eq("id",u.id).maybeSingle();
+      if (!data) { setPhase(PH.AUTH); return; }
+      if (data.user_role==="company") {
+        setCoProfile(data); loadCoJobs(data.id); loadCandidates(); setPhase(PH.CO_HOME);
+      } else {
+        setCandProfile(data);
+        setPhase(data.background ? PH.HOME : PH.CAND_PROFILE);
+      }
+    } catch { setPhase(PH.AUTH); }
   }
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior:"smooth" }); }, [phase, loading]);
-
-  useEffect(() => {
-    const handleSession = async () => {
-      const { data:{ session } } = await supabase.auth.getSession();
-      if (session?.user) { setUser(session.user); loadUserProfile(session.user.id); }
-      else { setPhase(PHASE.AUTH); }
-    };
-    handleSession();
-    const { data:{ subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session?.user) { setUser(session.user); loadUserProfile(session.user.id); }
-      else { setPhase(PHASE.AUTH); }
-    });
-    return () => subscription.unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (phase === PHASE.HOME && profile?.buckets?.length > 0) loadJobsForProfile(profile);
-  }, [phase, profile]);
-
-  async function loadJobsForProfile(p) {
+  async function loadJobs(p) {
     if (!p?.buckets?.length) return;
     setJobsLoading(true);
-    const allJobs = [];
-    for (const bucketId of p.buckets.slice(0,3)) {
-      const searchTerm = BUCKET_SEARCH_TERMS[bucketId] || bucketId;
-      const fetched = await fetchJobs(searchTerm, "India");
+    const all=[];
+    for (const bid of p.buckets.slice(0,3)) {
+      const fetched = await fetchJobs(BUCKET_TERMS[bid]||bid,"India");
       for (const job of fetched) {
-        job.matchScore = computeMatchScore(p.background, job);
-        job.bucketLabel = INTEREST_BUCKETS.find(b => b.id === bucketId)?.label || bucketId;
-        allJobs.push(job);
+        job.matchScore = computeMatchScore(p.background,job);
+        job.bucketLabel = BUCKETS.find(b=>b.id===bid)?.label||bid;
+        all.push(job);
       }
     }
-    allJobs.sort((a,b) => b.matchScore - a.matchScore);
-    setJobs(allJobs);
-    setJobsLoading(false);
+    all.sort((a,b)=>b.matchScore-a.matchScore);
+    setJobs(all); setJobsLoading(false);
   }
 
-  async function signInWithGoogle() {
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithOAuth({ provider:"google", options:{ redirectTo:window.location.origin } });
-    if (error) { setError(error.message); setLoading(false); }
-  }
-
-  async function signInWithEmail() {
-    if (!emailInput || !passwordInput) { setError("Please enter your email and password."); return; }
-    setLoading(true); setError("");
-    const { error } = await supabase.auth.signInWithPassword({ email:emailInput, password:passwordInput });
-    if (error) setError(error.message);
-    setLoading(false);
-  }
-
-  async function signUpWithEmail() {
-    if (!emailInput || !passwordInput) { setError("Please enter your email and a password to get started."); return; }
-    if (passwordInput.length < 6) { setError("Choose a password with at least 6 characters."); return; }
-    setLoading(true); setError("");
-    const { error } = await supabase.auth.signUp({ email:emailInput, password:passwordInput });
-    if (error) setError(error.message);
-    else setError("Check your email to confirm your account, then sign in.");
-    setLoading(false);
-  }
-
-  async function saveProfile() {
-    if (!draftBG.trim() || !user) return;
-    setLoading(true); setError("");
-    try {
-      const { data, error } = await supabase.from("users")
-        .upsert({ id:user.id, email:user.email, full_name:draftName.trim(), background:draftBG.trim(), buckets:draftBuckets }, { onConflict:"id" })
-        .select().maybeSingle();
-      if (error) setError(error.message);
-      else { setProfile(data); setPhase(PHASE.HOME); }
-    } catch { setError("Something went wrong — please try again."); }
-    setLoading(false);
-  }
-
-  async function saveHrProfile() {
-    if (!draftName.trim() || !user) return;
-    setLoading(true); setError("");
-    try {
-      const { data, error } = await supabase.from("users")
-        .upsert({ id:user.id, email:user.email, full_name:draftName.trim(), user_role:"hr", company_name:draftCompany.trim(), background:draftHrRole, buckets:draftBuckets }, { onConflict:"id" })
-        .select().maybeSingle();
-      if (error) setError(error.message);
-      else { setProfile(data); setUserRole("hr"); setPhase(PHASE.HR); loadCandidates(); }
-    } catch { setError("Something went wrong — please try again."); }
-    setLoading(false);
-  }
-
-  async function saveAssessment(matchScore) {
-    if (!user) return;
-    await supabase.from("skill_assessments").insert({ user_id:user.id, role_target:meta.jobTitle, skills:ratings, match_score:matchScore });
+  async function loadCoJobs(uid) {
+    const {data} = await supabase.from("job_posts").select("*").eq("hr_user_id",uid).order("created_at",{ascending:false});
+    setCoJobs(data||[]);
   }
 
   async function loadCandidates() {
-    const { data } = await supabase.from("skill_assessments").select("*, users(full_name, email)").order("created_at", { ascending:false });
-    setCandidates(data || []);
+    const {data} = await supabase.from("skill_assessments").select("*, users(full_name, email)").order("created_at",{ascending:false});
+    setCandidates(data||[]);
   }
 
-  async function logOutcome(assessmentId, outcome) {
-    await supabase.from("job_outcomes").insert({ user_id:selectedCandidate.user_id, job_title:selectedCandidate.role_target, match_score:selectedCandidate.match_score, outcome });
-    setSelectedCandidate(null);
-    loadCandidates();
+  /* ── auth ── */
+  async function googleAuth() {
+    setLoad(true);
+    const {error} = await supabase.auth.signInWithOAuth({provider:"google",options:{redirectTo:window.location.origin}});
+    if (error) { setError(error.message); setLoad(false); }
   }
 
-  function selectJobForAnalysis(job) {
-    setSelectedJob(job); setJd(job.description);
-    setMeta({ jobTitle:job.title, company:job.company, seniority:"", roleType:"", topPriority:"" });
-    setPhase(PHASE.SKILLS); setSkills([]); setRatings({});
+  async function emailAuth() {
+    if (!email||!password) { setError("Please enter your email and password."); return; }
+    setLoad(true); setError("");
+    if (authMode==="signup") {
+      if (password.length<6) { setError("Choose a password with at least 6 characters."); setLoad(false); return; }
+      const {data,error} = await supabase.auth.signUp({email,password});
+      if (error) { setError(error.message); setLoad(false); return; }
+      if (data.user) {
+        await supabase.from("users").upsert({id:data.user.id,email:data.user.email,user_role:authPersona},{onConflict:"id"});
+        setUser(data.user);
+        setPhase(authPersona==="company"?PH.CO_PROFILE:PH.CAND_PROFILE);
+      } else { setError("Check your email to confirm your account, then sign in."); }
+    } else {
+      const {error} = await supabase.auth.signInWithPassword({email,password});
+      if (error) setError(error.message);
+    }
+    setLoad(false);
   }
 
-  const skillSummary = skills.map(s => `${s}: ${ratings[s]||"?"}/5`).join(", ");
+  /* ── candidate ── */
+  async function saveCandProfile() {
+    if (!dBG.trim()||!user) return;
+    setLoad(true); setError("");
+    try {
+      const {data,error} = await supabase.from("users").upsert({
+        id:user.id,email:user.email,full_name:dName.trim(),user_role:"candidate",
+        background:dBG.trim(),skills_summary:dSkills.trim(),
+        preferred_location:dLoc.trim(),salary_expectation:dSalary.trim()||null,
+        buckets:dBuckets,
+      },{onConflict:"id"}).select().maybeSingle();
+      if (error) setError(error.message);
+      else { setCandProfile(data); setPhase(PH.HOME); }
+    } catch { setError("Something went wrong — please try again."); }
+    setLoad(false);
+  }
+
+  function editCandProfile() {
+    setDName(candProfile?.full_name||""); setDBG(candProfile?.background||"");
+    setDSkills(candProfile?.skills_summary||""); setDLoc(candProfile?.preferred_location||"");
+    setDSalary(candProfile?.salary_expectation||""); setDBuckets(candProfile?.buckets||[]);
+    setPhase(PH.CAND_PROFILE);
+  }
+
+  async function saveAssessment(score) {
+    if (!user) return;
+    await supabase.from("skill_assessments").insert({user_id:user.id,role_target:meta.jobTitle,skills:ratings,match_score:score});
+  }
+
+  const skillSummary = skills.map(s=>`${s}: ${ratings[s]||"?"}/5`).join(", ");
 
   async function analyzeJD() {
     if (!jd.trim()) return;
-    setLoading(true); setError("");
+    setLoad(true); setError("");
     try {
-      const raw = await callClaude([{ role:"user", content:P.jdAnalysis(jd).msg }], P.jdAnalysis(jd).sys);
+      const raw = await callClaude([{role:"user",content:P.jd(jd).msg}],P.jd(jd).sys);
       const parsed = JSON.parse(raw.replace(/```json|```/g,"").trim());
       setSkills(parsed.skills||[]);
-      setMeta({ jobTitle:parsed.jobTitle||"", company:parsed.company||"", seniority:parsed.seniorityLevel||"", roleType:parsed.roleType||"", topPriority:parsed.topPriority||"" });
-      setPhase(PHASE.SKILLS);
-    } catch { setError("Paste the full job description for the best results."); }
-    setLoading(false);
+      setMeta({jobTitle:parsed.jobTitle||"",company:parsed.company||"",seniority:parsed.seniorityLevel||"",roleType:parsed.roleType||"",topPriority:parsed.topPriority||""});
+      setPhase(PH.SKILLS);
+    } catch { setError("Paste the full job description for best results."); }
+    setLoad(false);
   }
 
-  async function getRecommendation() {
-    if (skills.some(s => !ratings[s])) { setError("Rate all skills to see your match score."); return; }
-    setLoading(true); setError("");
-    const res = await callClaude([{ role:"user", content:P.recommendation(jd,meta,skillSummary).msg }], P.recommendation(jd,meta,skillSummary).sys);
-    const scoreMatch = res.match(/(\d+)\/100/);
-    if (scoreMatch) await saveAssessment(parseInt(scoreMatch[1]));
-    setRec(res); setPhase(PHASE.REC); setLoading(false);
+  async function getRec() {
+    if (skills.some(s=>!ratings[s])) { setError("Rate all skills to see your match score."); return; }
+    setLoad(true); setError("");
+    const res = await callClaude([{role:"user",content:P.rec(jd,meta,skillSummary).msg}],P.rec(jd,meta,skillSummary).sys);
+    const m = res.match(/(\d+)\/100/);
+    if (m) await saveAssessment(parseInt(m[1]));
+    setRec(res); setPhase(PH.REC); setLoad(false);
   }
 
   async function tailorResume() {
-    setLoading(true); setError("");
-    const res = await callClaude([{ role:"user", content:P.resumeTailor(jd,meta,profile.background,skillSummary).msg }], P.resumeTailor(jd,meta,profile.background,skillSummary).sys);
-    setResume(res); setPhase(PHASE.RESUME); setLoading(false);
+    setLoad(true); setError("");
+    const res = await callClaude([{role:"user",content:P.resume(jd,meta,candProfile.background,skillSummary).msg}],P.resume(jd,meta,candProfile.background,skillSummary).sys);
+    setResume(res); setPhase(PH.RESUME); setLoad(false);
   }
 
   async function runATS() {
-    setLoading(true); setError("");
-    const res = await callClaude([{ role:"user", content:P.atsReview(jd,meta,resume).msg }], P.atsReview(jd,meta,resume).sys);
+    setLoad(true); setError("");
+    const res = await callClaude([{role:"user",content:P.ats(jd,meta,resume).msg}],P.ats(jd,meta,resume).sys);
     const m = res.match(/ATS Score:\s*(\d+)\/100/i);
     if (m) setAtsScore(parseInt(m[1]));
-    setAtsReview(res); setPhase(PHASE.ATS); setLoading(false);
+    setAtsReview(res); setPhase(PH.ATS); setLoad(false);
   }
 
-  async function generateCL() {
-    setLoading(true); setError("");
-    const res = await callClaude([{ role:"user", content:P.coverLetter(jd,meta,resume,recommendation).msg }], P.coverLetter(jd,meta,resume,recommendation).sys);
-    setCL(res); setPhase(PHASE.CL); setLoading(false);
+  async function genCL() {
+    setLoad(true); setError("");
+    const res = await callClaude([{role:"user",content:P.cl(jd,meta,resume).msg}],P.cl(jd,meta,resume).sys);
+    setCl(res); setPhase(PH.CL); setLoad(false);
   }
 
   function startManualJD() {
-    setJd(""); setMeta({ jobTitle:"", company:"", seniority:"", roleType:"", topPriority:"" });
-    setSkills([]); setRatings({}); setRec(""); setResume("");
-    setAtsReview(""); setAtsScore(null); setCL(""); setError("");
-    setSelectedJob(null); setPhase(PHASE.JD);
+    setJd(""); setMeta({jobTitle:"",company:"",seniority:"",roleType:"",topPriority:""});
+    setSkills([]); setRatings({}); setRec(""); setResume(""); setAtsReview(""); setAtsScore(null); setCl(""); setError("");
+    setSelJob(null); setPhase(PH.JD);
   }
 
-  function startEditProfile() {
-    setDraftName(profile?.full_name||""); setDraftBG(profile?.background||""); setDraftBuckets(profile?.buckets||[]);
-    setPhase(PHASE.SETUP_INFO);
+  function selectJob(job) {
+    setSelJob(job); setJd(job.description);
+    setMeta({jobTitle:job.title,company:job.company,seniority:"",roleType:"",topPriority:""});
+    setPhase(PH.SKILLS); setSkills([]); setRatings({});
   }
 
-  const inFlow = [PHASE.JD,PHASE.SKILLS,PHASE.REC,PHASE.RESUME,PHASE.ATS,PHASE.CL].includes(phase);
+  /* ── company ── */
+  async function saveCoProfile() {
+    if (!coName.trim()||!coIndustry||!user) return;
+    setLoad(true); setError("");
+    try {
+      const {data,error} = await supabase.from("users").upsert({
+        id:user.id,email:user.email,full_name:coContact.trim(),
+        user_role:"company",company_name:coName.trim(),
+        industry:coIndustry,company_size:coSize,company_website:coWebsite.trim(),
+      },{onConflict:"id"}).select().maybeSingle();
+      if (error) setError(error.message);
+      else { setCoProfile(data); setPhase(PH.CO_HOME); }
+    } catch { setError("Something went wrong — please try again."); }
+    setLoad(false);
+  }
 
-  /* ── input style ── */
-  const inputStyle = { width:"100%", boxSizing:"border-box", background:T.card, border:`1px solid ${T.border}`, borderRadius:10, padding:"0.75rem", color:T.text, fontSize:"0.87rem", fontFamily:"'DM Sans',sans-serif", outline:"none" };
-  const labelStyle = { display:"block", color:T.muted, fontSize:"0.72rem", fontWeight:600, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:"0.35rem" };
+  async function postJob() {
+    if (!jpTitle.trim()||!jpJD.trim()||!user) return;
+    setLoad(true); setError("");
+    try {
+      const {error} = await supabase.from("job_posts").insert({
+        hr_user_id:user.id,title:jpTitle.trim(),company_display:coProfile?.company_name||"",
+        location:jpLoc.trim(),jd:jpJD.trim(),job_type:jpType,
+        salary_range:jpSalary.trim(),deadline:jpDeadline||null,status:"active",
+      });
+      if (error) setError(error.message);
+      else {
+        setJpTitle(""); setJpJD(""); setJpLoc(""); setJpType(""); setJpSalary(""); setJpDeadline("");
+        loadCoJobs(user.id); setPhase(PH.CO_HOME);
+      }
+    } catch { setError("Something went wrong — please try again."); }
+    setLoad(false);
+  }
 
+  async function logOutcome(outcome) {
+    if (!selCand) return;
+    await supabase.from("job_outcomes").insert({user_id:selCand.user_id,job_title:selCand.role_target,match_score:selCand.match_score,outcome});
+    setSelCand(null); loadCandidates();
+  }
+
+  const inFlow=[PH.JD,PH.SKILLS,PH.REC,PH.RESUME,PH.ATS,PH.CL].includes(phase);
+
+  /* ── shared nav strip ── */
+  function NavStrip({label,onBack}) {
+    return (
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"1rem",padding:"0.6rem 1rem",background:T.charcoal,borderRadius:10,animation:"fadeIn 0.3s ease"}}>
+        <span style={{color:"#fff",fontSize:"0.72rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em"}}>{label}</span>
+        <button onClick={onBack} style={{background:"rgba(255,255,255,0.1)",border:"none",borderRadius:6,padding:"3px 10px",color:"rgba(255,255,255,0.7)",fontSize:"0.72rem",cursor:"pointer",transition:"background 0.15s"}}
+          onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.2)"}
+          onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,0.1)"}>← Back</button>
+      </div>
+    );
+  }
+
+  /* ══════════════════════════
+     RENDER
+  ══════════════════════════ */
   return (
-    <div style={{ background:T.bg, minHeight:"100vh", fontFamily:"'DM Sans',sans-serif", padding:"1.5rem 1rem" }}>
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-      <style>{`@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}} @keyframes pulse{0%,80%,100%{transform:translateY(0);opacity:0.5}40%{transform:translateY(-6px);opacity:1}}`}</style>
+    <div style={{background:T.bg,minHeight:"100vh",fontFamily:"'DM Sans',sans-serif",padding:"1.5rem 1rem"}}>
+      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet"/>
+      <style>{`
+        @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+        @keyframes slideRight{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:translateX(0)}}
+        @keyframes pulse{0%,80%,100%{transform:translateY(0);opacity:0.4}40%{transform:translateY(-7px);opacity:1}}
+        @keyframes scaleIn{from{opacity:0;transform:scale(0.95)}to{opacity:1;transform:scale(1)}}
+        @keyframes goldPulse{0%,100%{box-shadow:0 0 0 0 rgba(201,150,42,0.3)}50%{box-shadow:0 0 0 6px rgba(201,150,42,0)}}
+        input::placeholder,textarea::placeholder{color:${T.muted};opacity:0.6}
+        select option{color:${T.text};background:#fff}
+      `}</style>
 
-      <div style={{ maxWidth:720, margin:"0 auto" }}>
+      <div style={{maxWidth:720,margin:"0 auto"}}>
 
         {/* HEADER */}
-        <header style={{ textAlign:"center", marginBottom:"1.5rem" }}>
-          <h1 style={{ fontFamily:"'Syne',sans-serif", fontSize:"clamp(1.6rem,5vw,2.2rem)", fontWeight:800, color:T.teal, margin:"0 0 0.2rem" }}>
-            Easy<span style={{ color:T.terra }}>Job</span>
+        <header style={{textAlign:"center",marginBottom:"1.5rem",animation:"fadeDown 0.4s ease"}}>
+          <h1 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(1.6rem,5vw,2.2rem)",fontWeight:800,color:T.charcoal,margin:"0 0 0.2rem"}}>
+            Easy<span style={{color:T.gold}}>Job</span>
           </h1>
-          <p style={{ color:T.muted, fontSize:"0.8rem", margin:0 }}>AI-Powered Career Intelligence · Global</p>
-          {user && (
-            <button onClick={() => supabase.auth.signOut()} style={{ marginTop:"0.6rem", background:"transparent", border:`1px solid ${T.border}`, borderRadius:20, padding:"5px 14px", color:T.muted, fontSize:"0.75rem", cursor:"pointer" }}>
+          <p style={{color:T.muted,fontSize:"0.8rem",margin:0}}>AI-Powered Career Intelligence · Global</p>
+          {user&&(
+            <button onClick={()=>supabase.auth.signOut()}
+              style={{marginTop:"0.6rem",background:"transparent",border:`1px solid ${T.border}`,borderRadius:20,padding:"5px 14px",color:T.muted,fontSize:"0.75rem",cursor:"pointer",transition:"all 0.15s"}}
+              onMouseEnter={e=>{e.currentTarget.style.background=T.charcoal;e.currentTarget.style.color="#fff";e.currentTarget.style.borderColor=T.charcoal;}}
+              onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color=T.muted;e.currentTarget.style.borderColor=T.border;}}>
               Sign out
             </button>
           )}
         </header>
 
         {/* ERROR */}
-        {error && (
-          <div style={{ background:T.terraLt, border:`1px solid ${T.terra}`, borderRadius:10, padding:"0.75rem 1rem", marginBottom:"1rem", display:"flex", justifyContent:"space-between" }}>
-            <span style={{ color:T.terraDk, fontSize:"0.82rem" }}>{error}</span>
-            <button onClick={() => setError("")} style={{ background:"none", border:"none", color:T.terraDk, cursor:"pointer" }}>×</button>
+        {error&&(
+          <div style={{background:T.goldLt,border:`1px solid ${T.gold}`,borderRadius:10,padding:"0.75rem 1rem",marginBottom:"1rem",display:"flex",justifyContent:"space-between",alignItems:"center",animation:"scaleIn 0.2s ease"}}>
+            <span style={{color:T.goldDk,fontSize:"0.82rem"}}>{error}</span>
+            <button onClick={()=>setError("")} style={{background:"none",border:"none",color:T.goldDk,cursor:"pointer",fontSize:"1rem"}}>×</button>
           </div>
         )}
 
-        {/* AUTH */}
-        {phase === PHASE.AUTH && (
+        {/* ═══ AUTH ═══ */}
+        {phase===PH.AUTH&&(
           <Card>
-            <div style={{ textAlign:"center", padding:"0.5rem 0 1rem" }}>
-              <div style={{ fontSize:"2rem", marginBottom:"0.75rem" }}>👋</div>
-              <h2 style={{ fontFamily:"'Syne',sans-serif", fontSize:"1.3rem", color:T.teal, margin:"0 0 0.4rem" }}>Welcome to EasyJob</h2>
-              <p style={{ color:T.muted, fontSize:"0.84rem", margin:"0 0 1.5rem" }}>Your AI-powered career intelligence platform.</p>
+            <div style={{textAlign:"center",paddingBottom:"0.5rem"}}>
+              <div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>👋</div>
+              <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"1.2rem",color:T.charcoal,margin:"0 0 0.3rem"}}>Welcome to EasyJob</h2>
+              <p style={{color:T.muted,fontSize:"0.83rem",margin:"0 0 1.5rem"}}>AI-powered career intelligence, built for everyone</p>
 
-              <div style={{ display:"flex", gap:"0.5rem", justifyContent:"center", marginBottom:"1.25rem" }}>
-                {["signin","signup"].map(m => (
-                  <button key={m} onClick={() => setAuthMode(m)} style={{ padding:"0.4rem 1.25rem", borderRadius:20, border:`1px solid ${authMode===m?T.teal:T.border}`, background:authMode===m?T.teal:T.bg, color:authMode===m?"#fff":T.muted, fontSize:"0.8rem", fontWeight:600, cursor:"pointer" }}>
-                    {m === "signin" ? "Sign in" : "Create account"}
-                  </button>
-                ))}
-              </div>
-
-              <div style={{ display:"flex", flexDirection:"column", gap:"0.75rem", maxWidth:340, margin:"0 auto 1.25rem" }}>
-                <div>
-                  <label style={{ ...labelStyle, textAlign:"left" }}>Email</label>
-                  <input style={inputStyle} type="email" placeholder="you@example.com" value={emailInput} onChange={e => setEmailInput(e.target.value)} />
-                </div>
-                <div>
-                  <label style={{ ...labelStyle, textAlign:"left" }}>Password</label>
-                  <input style={inputStyle} type="password" placeholder="••••••••" value={passwordInput} onChange={e => setPasswordInput(e.target.value)} />
-                </div>
-                {loading ? <Spinner /> : (
-                  <Btn onClick={authMode==="signin"?signInWithEmail:signUpWithEmail}>
-                    {authMode === "signin" ? "Sign in →" : "Create my account →"}
-                  </Btn>
-                )}
-              </div>
-
-              <div style={{ display:"flex", alignItems:"center", gap:"0.75rem", maxWidth:340, margin:"0 auto 1.25rem" }}>
-                <div style={{ flex:1, height:1, background:T.border }} />
-                <span style={{ color:T.muted, fontSize:"0.75rem" }}>or</span>
-                <div style={{ flex:1, height:1, background:T.border }} />
-              </div>
-
-              <div style={{ display:"flex", justifyContent:"center" }}>
-                <button onClick={signInWithGoogle} disabled={loading} style={{ display:"flex", alignItems:"center", gap:10, background:T.card, border:`1px solid ${T.border}`, borderRadius:10, padding:"0.75rem 1.5rem", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:"0.9rem", fontWeight:600, color:T.text }}>
-                  <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20H24v8h11.3C33.6 33.1 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.7 1.1 7.8 2.9l5.7-5.7C34.1 6.5 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c11 0 20-8.9 20-20 0-1.3-.1-2.7-.4-4z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 16 19 13 24 13c3 0 5.7 1.1 7.8 2.9l5.7-5.7C34.1 6.5 29.3 4 24 4c-7.7 0-14.3 4.4-17.7 10.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-1.9 13.5-5l-6.2-5.2C29.4 35.5 26.8 36 24 36c-5.2 0-9.6-2.9-11.3-7.1l-6.5 5C9.6 39.4 16.3 44 24 44z"/><path fill="#1976D2" d="M43.6 20H24v8h11.3c-.8 2.3-2.3 4.3-4.3 5.8l6.2 5.2C41 35.5 44 30.2 44 24c0-1.3-.1-2.7-.4-4z"/></svg>
-                  Continue with Google
-                </button>
-              </div>
-            </div>
-          </Card>
-        )}
-
-        {/* ROLE SELECT */}
-        {phase === PHASE.ROLE_SELECT && (
-          <div style={{ animation:"fadeUp 0.3s ease forwards" }}>
-            <div style={{ textAlign:"center", marginBottom:"1.75rem" }}>
-              <h2 style={{ fontFamily:"'Syne',sans-serif", fontSize:"1.4rem", color:T.teal, margin:"0 0 0.5rem" }}>How will you use EasyJob?</h2>
-              <p style={{ color:T.muted, fontSize:"0.85rem" }}>Choose the experience that fits you best</p>
-            </div>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"1rem" }}>
-              {[
-                { role:"seeker", icon:"👤", title:"I am looking for a job", desc:"Get matched to real jobs. AI resume tailoring. Skill tests. Real feedback." },
-                { role:"hr",     icon:"🏢", title:"I am hiring",            desc:"Review pre-scored candidates. Build your pipeline. Log outcomes." },
-              ].map(({ role, icon, title, desc }) => (
-                <button key={role} onClick={() => { setUserRole(role); setPhase(role==="hr"?PHASE.HR_SETUP:PHASE.SETUP_INFO); }}
-                  style={{ background:T.card, border:`1px solid ${T.border}`, borderRadius:16, padding:"2rem 1.25rem", cursor:"pointer", textAlign:"center", transition:"all 0.2s", fontFamily:"'DM Sans',sans-serif" }}
-                  onMouseOver={e => { e.currentTarget.style.borderColor=T.teal; e.currentTarget.style.background=T.tealLt; }}
-                  onMouseOut={e => { e.currentTarget.style.borderColor=T.border; e.currentTarget.style.background=T.card; }}>
-                  <div style={{ fontSize:"2.5rem", marginBottom:"0.75rem" }}>{icon}</div>
-                  <div style={{ color:T.teal, fontSize:"1rem", fontWeight:700, fontFamily:"'Syne',sans-serif", marginBottom:"0.5rem" }}>{title}</div>
-                  <div style={{ color:T.muted, fontSize:"0.78rem", lineHeight:1.5 }}>{desc}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* HR SETUP */}
-        {phase === PHASE.HR_SETUP && (
-          <Card>
-            <div style={{ display:"flex", alignItems:"center", gap:"0.5rem", marginBottom:"1rem" }}>
-              <div style={{ width:24, height:24, borderRadius:"50%", background:T.teal, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"0.7rem", fontWeight:800, color:"#fff" }}>1</div>
-              <h2 style={{ fontFamily:"'Syne',sans-serif", fontSize:"1rem", color:T.teal, margin:0 }}>Set up your hiring profile</h2>
-            </div>
-            {[
-              { label:"Your Name *", value:draftName, set:setDraftName, placeholder:"e.g. Rahul Sharma", type:"text" },
-              { label:"Company / Organisation *", value:draftCompany, set:setDraftCompany, placeholder:"e.g. Zepto, McKinsey, Independent Recruiter", type:"text" },
-            ].map(({ label, value, set, placeholder, type }) => (
-              <div key={label} style={{ marginBottom:"1rem" }}>
-                <label style={labelStyle}>{label}</label>
-                <input style={inputStyle} type={type} placeholder={placeholder} value={value} onChange={e => set(e.target.value)} />
-              </div>
-            ))}
-            <div style={{ marginBottom:"1rem" }}>
-              <label style={labelStyle}>Your Role</label>
-              <select value={draftHrRole} onChange={e => setDraftHrRole(e.target.value)} style={{ ...inputStyle }}>
-                <option value="">Select your role</option>
-                {["HR Manager","Talent Acquisition","Recruiter","Founder","Hiring Manager","Independent Recruiter"].map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-            </div>
-            <div style={{ marginBottom:"1.25rem" }}>
-              <label style={labelStyle}>Roles you typically hire for</label>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"0.4rem" }}>
-                {INTEREST_BUCKETS.map(b => {
-                  const sel = draftBuckets.includes(b.id);
+              <p style={{color:T.text,fontSize:"0.82rem",fontWeight:600,margin:"0 0 0.75rem"}}>I am a...</p>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.75rem",marginBottom:"1.25rem"}}>
+                {[
+                  {id:"candidate",icon:"👤",label:"Candidate",desc:"Find jobs, get matched, build your career"},
+                  {id:"company",  icon:"🏢",label:"Company",  desc:"Post roles and hire pre-scored talent"},
+                ].map(({id,icon,label,desc})=>{
+                  const sel=authPersona===id;
                   return (
-                    <button key={b.id} onClick={() => setDraftBuckets(p => sel?p.filter(x=>x!==b.id):[...p,b.id])}
-                      style={{ display:"flex", alignItems:"center", gap:"0.5rem", padding:"0.6rem 0.8rem", borderRadius:10, border:`1px solid ${sel?T.teal:T.border}`, background:sel?T.tealLt:T.card, cursor:"pointer" }}>
-                      <span style={{ fontSize:"0.9rem" }}>{b.icon}</span>
-                      <span style={{ fontSize:"0.78rem", color:sel?T.teal:T.muted, fontWeight:sel?600:400 }}>{b.label}</span>
-                      {sel && <span style={{ marginLeft:"auto", color:T.teal, fontSize:"0.8rem" }}>✓</span>}
+                    <button key={id} onClick={()=>setAuthPersona(id)}
+                      style={{border:`2px solid ${sel?T.charcoal:T.border}`,background:sel?T.charcoal:T.cardHi,borderRadius:12,padding:"1rem 0.75rem",cursor:"pointer",textAlign:"center",transition:"all 0.2s",transform:sel?"scale(1.02)":"scale(1)"}}>
+                      <div style={{fontSize:"1.5rem",marginBottom:6}}>{icon}</div>
+                      <p style={{fontSize:"0.87rem",fontWeight:600,color:sel?"#fff":T.text,margin:"0 0 3px"}}>{label}</p>
+                      <p style={{fontSize:"0.72rem",color:sel?"rgba(255,255,255,0.7)":T.muted,margin:0}}>{desc}</p>
                     </button>
                   );
                 })}
               </div>
-            </div>
-            <div style={{ display:"flex", justifyContent:"space-between" }}>
-              <Btn variant="secondary" onClick={() => setPhase(PHASE.ROLE_SELECT)}>← Back</Btn>
-              <div style={{ display:"flex", alignItems:"center", gap:"1rem" }}>
-                {loading && <Spinner />}
-                <Btn onClick={saveHrProfile} disabled={loading||!draftName.trim()||!draftCompany.trim()}>{loading?"Saving...":"Go to HR Dashboard →"}</Btn>
+
+              <div style={{display:"flex",gap:"0.5rem",marginBottom:"1rem"}}>
+                {["signin","signup"].map(m=>(
+                  <button key={m} onClick={()=>setAuthMode(m)}
+                    style={{flex:1,padding:"8px",borderRadius:20,border:`1.5px solid ${authMode===m?T.charcoal:T.border}`,background:authMode===m?T.charcoal:T.bg,color:authMode===m?"#fff":T.muted,fontSize:"0.8rem",fontWeight:600,cursor:"pointer",transition:"all 0.2s"}}>
+                    {m==="signin"?"Sign in":"Create account"}
+                  </button>
+                ))}
               </div>
+
+              <div style={{display:"flex",flexDirection:"column",gap:"0.75rem",marginBottom:"1rem",textAlign:"left"}}>
+                <Input label="Email" value={email} onChange={setEmail} placeholder="you@example.com" type="email"/>
+                <Input label="Password" value={password} onChange={setPassword} placeholder="••••••••" type="password"/>
+              </div>
+
+              {loading?<Spinner/>:<Btn full onClick={emailAuth}>
+                {authMode==="signin"?`Sign in as ${authPersona==="company"?"Company":"Candidate"} →`:`Create ${authPersona==="company"?"Company":"Candidate"} account →`}
+              </Btn>}
+
+              <div style={{display:"flex",alignItems:"center",gap:"0.75rem",margin:"1rem 0"}}>
+                <div style={{flex:1,height:1,background:T.border}}/><span style={{color:T.muted,fontSize:"0.75rem"}}>or</span><div style={{flex:1,height:1,background:T.border}}/>
+              </div>
+
+              <button onClick={googleAuth} disabled={loading}
+                style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:10,background:T.cardHi,border:`1px solid ${T.border}`,borderRadius:10,padding:"0.75rem",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:"0.87rem",fontWeight:600,color:T.text,transition:"all 0.2s"}}
+                onMouseEnter={e=>{e.currentTarget.style.background=T.card;e.currentTarget.style.borderColor=T.charcoal;}}
+                onMouseLeave={e=>{e.currentTarget.style.background=T.cardHi;e.currentTarget.style.borderColor=T.border;}}>
+                <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20H24v8h11.3C33.6 33.1 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.7 1.1 7.8 2.9l5.7-5.7C34.1 6.5 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c11 0 20-8.9 20-20 0-1.3-.1-2.7-.4-4z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 16 19 13 24 13c3 0 5.7 1.1 7.8 2.9l5.7-5.7C34.1 6.5 29.3 4 24 4c-7.7 0-14.3 4.4-17.7 10.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-1.9 13.5-5l-6.2-5.2C29.4 35.5 26.8 36 24 36c-5.2 0-9.6-2.9-11.3-7.1l-6.5 5C9.6 39.4 16.3 44 24 44z"/><path fill="#1976D2" d="M43.6 20H24v8h11.3c-.8 2.3-2.3 4.3-4.3 5.8l6.2 5.2C41 35.5 44 30.2 44 24c0-1.3-.1-2.7-.4-4z"/></svg>
+                Continue with Google
+              </button>
+              <p style={{color:T.muted,fontSize:"0.7rem",marginTop:"1rem"}}>By continuing you agree to EasyJob's Terms of Service</p>
             </div>
           </Card>
         )}
 
-        {/* SETUP INFO */}
-        {phase === PHASE.SETUP_INFO && (
+        {/* ═══ CANDIDATE PROFILE ═══ */}
+        {phase===PH.CAND_PROFILE&&(
           <Card>
-            <div style={{ display:"flex", alignItems:"center", gap:"0.5rem", marginBottom:"1rem" }}>
-              <div style={{ width:24, height:24, borderRadius:"50%", background:T.teal, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"0.7rem", fontWeight:800, color:"#fff" }}>1</div>
-              <h2 style={{ fontFamily:"'Syne',sans-serif", fontSize:"1rem", color:T.teal, margin:0 }}>Your profile</h2>
-              <span style={{ color:T.muted, fontSize:"0.75rem" }}>Step 1 of 2</span>
-            </div>
-            <div style={{ marginBottom:"1rem" }}>
-              <label style={labelStyle}>Your Name</label>
-              <input style={inputStyle} placeholder="e.g. Priya Sharma" value={draftName} onChange={e => setDraftName(e.target.value)} />
-            </div>
-            <label style={labelStyle}>Your Background & Resume *</label>
-            <TA value={draftBG} onChange={setDraftBG} rows={11} placeholder={`Paste your resume or describe your background:\n\n• Work experience (company, role, dates, achievements)\n• Education & certifications\n• Technical skills & tools\n• Projects and notable wins`} />
-            <div style={{ display:"flex", justifyContent:"flex-end", marginTop:"1rem" }}>
-              <Btn onClick={() => { if (draftBG.trim()) setPhase(PHASE.SETUP_BUCKETS); }} disabled={!draftBG.trim()}>Choose Interests →</Btn>
+            <SectionHeader step={1} total={2} title="Build your profile"/>
+            <Input label="Your Name" value={dName} onChange={setDName} placeholder="e.g. Priya Sharma"/>
+            <TA label="Background & Resume *" value={dBG} onChange={setDBG} rows={10}
+              placeholder={`Paste your resume or describe your background:\n\n• Work experience (company, role, dates, achievements)\n• Education & certifications\n• Projects and notable wins`}/>
+            <TA label="Key Skills & Tools" value={dSkills} onChange={setDSkills} rows={3} optional
+              placeholder="e.g. Python, SQL, Tableau, Agile, Stakeholder management"/>
+            <Input label="Preferred Location" value={dLoc} onChange={setDLoc} placeholder="e.g. Hyderabad, Bangalore, Remote"/>
+            <Input label="Salary Expectation" value={dSalary} onChange={setDSalary} placeholder="e.g. ₹18–22 LPA" optional/>
+            <div style={{display:"flex",justifyContent:"flex-end",marginTop:"0.5rem"}}>
+              <Btn onClick={()=>{ if(dBG.trim()) setPhase(PH.CAND_BUCKETS); else setError("Add your background to continue."); }} disabled={!dBG.trim()}>
+                Choose Job Interests →
+              </Btn>
             </div>
           </Card>
         )}
 
-        {/* SETUP BUCKETS */}
-        {phase === PHASE.SETUP_BUCKETS && (
+        {/* ═══ CANDIDATE BUCKETS ═══ */}
+        {phase===PH.CAND_BUCKETS&&(
           <Card>
-            <div style={{ display:"flex", alignItems:"center", gap:"0.5rem", marginBottom:"0.5rem" }}>
-              <div style={{ width:24, height:24, borderRadius:"50%", background:T.teal, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"0.7rem", fontWeight:800, color:"#fff" }}>2</div>
-              <h2 style={{ fontFamily:"'Syne',sans-serif", fontSize:"1rem", color:T.teal, margin:0 }}>What jobs do you want to see?</h2>
-            </div>
-            <p style={{ color:T.muted, fontSize:"0.78rem", margin:"0 0 1.2rem" }}>Select all that apply. EasyJob fetches real jobs from these areas for you.</p>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"0.5rem", marginBottom:"1.2rem" }}>
-              {INTEREST_BUCKETS.map(b => {
-                const sel = draftBuckets.includes(b.id);
+            <SectionHeader step={2} total={2} title="What roles interest you?"/>
+            <p style={{color:T.muted,fontSize:"0.78rem",margin:"-0.5rem 0 1.25rem"}}>Select all that apply — EasyJob fetches real jobs from these areas for you.</p>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.5rem",marginBottom:"1.25rem"}}>
+              {BUCKETS.map((b,i)=>{
+                const sel=dBuckets.includes(b.id);
                 return (
-                  <button key={b.id} onClick={() => setDraftBuckets(p => sel?p.filter(x=>x!==b.id):[...p,b.id])}
-                    style={{ display:"flex", alignItems:"center", gap:"0.5rem", padding:"0.7rem 0.9rem", borderRadius:10, border:`1px solid ${sel?T.teal:T.border}`, background:sel?T.tealLt:T.card, cursor:"pointer", textAlign:"left", transition:"all 0.15s" }}>
-                    <span style={{ fontSize:"1rem" }}>{b.icon}</span>
-                    <span style={{ fontSize:"0.8rem", color:sel?T.teal:T.muted, fontWeight:sel?600:400 }}>{b.label}</span>
-                    {sel && <span style={{ marginLeft:"auto", color:T.teal, fontSize:"0.8rem" }}>✓</span>}
+                  <button key={b.id} onClick={()=>setDBuckets(p=>sel?p.filter(x=>x!==b.id):[...p,b.id])}
+                    style={{display:"flex",alignItems:"center",gap:"0.5rem",padding:"0.7rem 0.9rem",borderRadius:10,border:`1.5px solid ${sel?T.charcoal:T.border}`,background:sel?T.charcoal:T.cardHi,cursor:"pointer",textAlign:"left",transition:"all 0.18s",transform:sel?"scale(1.01)":"scale(1)",animation:`fadeUp 0.3s ease ${i*0.03}s both`}}>
+                    <span style={{fontSize:"1rem"}}>{b.icon}</span>
+                    <span style={{fontSize:"0.8rem",color:sel?"#fff":T.muted,fontWeight:sel?600:400}}>{b.label}</span>
+                    {sel&&<span style={{marginLeft:"auto",color:"#fff",fontSize:"0.8rem"}}>✓</span>}
                   </button>
                 );
               })}
             </div>
-            <div style={{ display:"flex", justifyContent:"space-between" }}>
-              <Btn variant="secondary" onClick={() => setPhase(PHASE.SETUP_INFO)}>← Back</Btn>
-              <div style={{ display:"flex", alignItems:"center", gap:"1rem" }}>
-                {loading && <Spinner />}
-                <Btn onClick={saveProfile} disabled={loading||draftBuckets.length===0}>{loading?"Saving...":"See My Jobs →"}</Btn>
+            <div style={{display:"flex",justifyContent:"space-between"}}>
+              <Btn variant="secondary" onClick={()=>setPhase(PH.CAND_PROFILE)}>← Back</Btn>
+              <div style={{display:"flex",alignItems:"center",gap:"1rem"}}>
+                {loading&&<Spinner/>}
+                <Btn onClick={saveCandProfile} disabled={loading||dBuckets.length===0}>{loading?"Saving...":"See My Jobs →"}</Btn>
               </div>
             </div>
           </Card>
         )}
 
-        {/* HOME */}
-        {phase === PHASE.HOME && userRole === "seeker" && (
-          <div style={{ animation:"fadeUp 0.3s ease forwards" }}>
-            <div style={{ background:T.tealLt, border:`1px solid ${T.teal}`, borderRadius:12, padding:"0.75rem 1rem", marginBottom:"1rem", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-              <div style={{ display:"flex", alignItems:"center", gap:"0.75rem" }}>
-                <div style={{ width:36, height:36, borderRadius:"50%", background:T.teal, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:700 }}>
-                  {(profile?.full_name||user?.email||"U")[0].toUpperCase()}
+        {/* ═══ CANDIDATE HOME ═══ */}
+        {phase===PH.HOME&&(
+          <div style={{animation:"fadeIn 0.3s ease"}}>
+            {/* header strip */}
+            <div style={{background:T.charcoal,borderRadius:14,padding:"1rem 1.25rem",marginBottom:"1.25rem",display:"flex",alignItems:"center",justifyContent:"space-between",animation:"fadeUp 0.3s ease"}}>
+              <div style={{display:"flex",alignItems:"center",gap:"0.75rem"}}>
+                <div style={{width:38,height:38,borderRadius:"50%",background:T.gold,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:700,fontSize:"1rem"}}>
+                  {(candProfile?.full_name||user?.email||"U")[0].toUpperCase()}
                 </div>
                 <div>
-                  <div style={{ color:T.teal, fontSize:"0.85rem", fontWeight:600 }}>{profile?.full_name||user?.email}</div>
-                  <div style={{ color:T.muted, fontSize:"0.72rem" }}>{profile?.buckets?.map(b=>INTEREST_BUCKETS.find(x=>x.id===b)?.label).filter(Boolean).join(" · ")}</div>
+                  <div style={{color:"#fff",fontSize:"0.9rem",fontWeight:600}}>{candProfile?.full_name||user?.email}</div>
+                  <div style={{color:"rgba(255,255,255,0.55)",fontSize:"0.72rem"}}>
+                    {[candProfile?.preferred_location,candProfile?.salary_expectation].filter(Boolean).join(" · ")}
+                  </div>
                 </div>
               </div>
-              <button onClick={startEditProfile} style={{ background:T.card, border:`1px solid ${T.border}`, borderRadius:6, padding:"4px 10px", color:T.muted, fontSize:"0.72rem", cursor:"pointer" }}>✏ Edit Profile</button>
+              <button onClick={editCandProfile}
+                style={{background:"rgba(255,255,255,0.1)",border:"none",borderRadius:8,padding:"5px 12px",color:"rgba(255,255,255,0.8)",fontSize:"0.75rem",cursor:"pointer",transition:"background 0.15s"}}
+                onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.2)"}
+                onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,0.1)"}>✏ Edit</button>
             </div>
 
-            <div style={{ marginBottom:"1rem" }}>
-              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"0.75rem" }}>
-                <h2 style={{ fontFamily:"'Syne',sans-serif", fontSize:"1rem", color:T.teal, margin:0 }}>Jobs matched for you</h2>
-                {jobsLoading && <Spinner />}
-                {!jobsLoading && jobs.length > 0 && <span style={{ color:T.muted, fontSize:"0.75rem" }}>{jobs.length} jobs found</span>}
-              </div>
-
-              {!jobsLoading && jobs.length === 0 && (
-                <div style={{ padding:"1.5rem", textAlign:"center", color:T.muted, fontSize:"0.84rem", background:T.card, border:`1px solid ${T.border}`, borderRadius:12 }}>
-                  Your job matches will appear here once your profile is set up.
-                </div>
-              )}
-
-              {jobs.slice(0,10).map(job => (
-                <div key={job.id} style={{ display:"flex", alignItems:"center", gap:"1rem", padding:"0.9rem 1rem", border:`1px solid ${T.border}`, borderRadius:12, marginBottom:"0.5rem", background:T.card, transition:"all 0.15s", cursor:"pointer" }}
-                  onMouseOver={e => e.currentTarget.style.borderColor=T.teal}
-                  onMouseOut={e => e.currentTarget.style.borderColor=T.border}>
-                  <ScoreBadge score={job.matchScore} />
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ color:T.text, fontSize:"0.88rem", fontWeight:600, marginBottom:"0.15rem", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{job.title}</div>
-                    <div style={{ color:T.muted, fontSize:"0.75rem" }}>{job.company} · {job.location}</div>
-                    <span style={{ display:"inline-block", marginTop:"0.25rem", fontSize:"0.65rem", padding:"2px 7px", borderRadius:20, background:T.tealLt, color:T.teal }}>{job.bucketLabel}</span>
-                  </div>
-                  <Btn small onClick={() => selectJobForAnalysis(job)}>Analyse →</Btn>
-                </div>
+            {/* stats */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0.75rem",marginBottom:"1.25rem"}}>
+              {[
+                {label:"Jobs matched",value:jobs.length||"—",color:T.charcoal},
+                {label:"Buckets active",value:candProfile?.buckets?.length||0,color:T.gold},
+                {label:"Profile score",value:"100%",color:T.charcoal},
+              ].map(({label,value,color},i)=>(
+                <SurfaceCard key={label} delay={i*0.05} style={{textAlign:"center"}}>
+                  <p style={{fontFamily:"'Syne',sans-serif",fontSize:"1.4rem",fontWeight:800,color,margin:"0 0 4px"}}>{value}</p>
+                  <p style={{fontSize:"0.72rem",color:T.muted,margin:0}}>{label}</p>
+                </SurfaceCard>
               ))}
             </div>
 
-            <div style={{ borderTop:`1px solid ${T.border}`, paddingTop:"1rem", textAlign:"center" }}>
-              <p style={{ color:T.muted, fontSize:"0.8rem", marginBottom:"0.75rem" }}>Have a specific role in mind?</p>
-              <Btn variant="terra" onClick={startManualJD}>Paste a Job Description →</Btn>
+            {/* job feed */}
+            <div style={{marginBottom:"1.25rem"}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"0.75rem"}}>
+                <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"1rem",color:T.charcoal,margin:0}}>Jobs matched for you</h2>
+                {jobsLoading&&<Spinner/>}
+                {!jobsLoading&&jobs.length>0&&<GoldTag>{jobs.length} found</GoldTag>}
+              </div>
+              {!jobsLoading&&jobs.length===0&&(
+                <SurfaceCard style={{textAlign:"center",padding:"1.5rem"}}>
+                  <p style={{color:T.muted,fontSize:"0.84rem",margin:0}}>Your matched jobs will appear here once your profile is complete.</p>
+                </SurfaceCard>
+              )}
+              {jobs.slice(0,10).map((job,i)=>(
+                <JobCard key={job.id} job={job} onAnalyse={selectJob} delay={i*0.04}/>
+              ))}
+            </div>
+
+            <div style={{borderTop:`1px solid ${T.border}`,paddingTop:"1rem",textAlign:"center"}}>
+              <p style={{color:T.muted,fontSize:"0.8rem",marginBottom:"0.75rem"}}>Have a specific role in mind?</p>
+              <Btn variant="gold" onClick={startManualJD}>Paste a Job Description →</Btn>
             </div>
           </div>
         )}
 
-        {/* FLOW HEADER */}
-        {inFlow && (
+        {/* ═══ FLOW HEADER ═══ */}
+        {inFlow&&(
           <>
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"1rem", padding:"0.55rem 0.85rem", background:T.tealLt, border:`1px solid ${T.teal}`, borderRadius:10 }}>
-              <span style={{ color:T.teal, fontSize:"0.7rem", fontWeight:700, textTransform:"uppercase" }}>
-                {selectedJob ? `📋 ${selectedJob.title} · ${selectedJob.company}` : `✓ ${profile?.full_name||user?.email}`}
-              </span>
-              <button onClick={() => setPhase(PHASE.HOME)} style={{ background:T.card, border:`1px solid ${T.border}`, borderRadius:6, padding:"3px 9px", color:T.muted, fontSize:"0.7rem", cursor:"pointer" }}>← Home</button>
-            </div>
-            <FlowStepper current={phase} />
+            <NavStrip
+              label={selJob?`📋 ${selJob.title} · ${selJob.company}`:`✓ ${candProfile?.full_name||user?.email}`}
+              onBack={()=>setPhase(PH.HOME)}/>
+            <FlowStepper current={phase}/>
           </>
         )}
 
         {/* JD */}
-        {phase === PHASE.JD && (
+        {phase===PH.JD&&(
           <Card>
-            <h2 style={{ fontFamily:"'Syne',sans-serif", fontSize:"1rem", color:T.teal, margin:"0 0 0.25rem" }}>Paste the Job Description</h2>
-            <p style={{ color:T.muted, fontSize:"0.75rem", margin:"0 0 0.9rem" }}>Include the full JD for the most accurate skill extraction.</p>
-            <TA value={jd} onChange={setJd} rows={11} placeholder="Paste the full job description here..." />
-            <div style={{ display:"flex", justifyContent:"flex-end", alignItems:"center", gap:"1rem", marginTop:"1rem" }}>
-              {loading && <Spinner />}
+            <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"1rem",color:T.charcoal,margin:"0 0 0.25rem"}}>Paste the Job Description</h2>
+            <p style={{color:T.muted,fontSize:"0.75rem",margin:"0 0 0.9rem"}}>Include the full JD for the most accurate skill extraction.</p>
+            <TA value={jd} onChange={setJd} rows={11} placeholder="Paste the full job description here..."/>
+            <div style={{display:"flex",justifyContent:"flex-end",alignItems:"center",gap:"1rem",marginTop:"1rem"}}>
+              {loading&&<Spinner/>}
               <Btn onClick={analyzeJD} disabled={loading||!jd.trim()}>{loading?"Analysing...":"Extract Skills →"}</Btn>
             </div>
           </Card>
         )}
 
         {/* SKILLS */}
-        {phase === PHASE.SKILLS && (
+        {phase===PH.SKILLS&&(
           <Card>
-            <h2 style={{ fontFamily:"'Syne',sans-serif", fontSize:"1rem", color:T.teal, margin:"0 0 0.2rem" }}>Rate Your Skills</h2>
-            <p style={{ color:T.muted, fontSize:"0.75rem", margin:"0 0 0.9rem" }}>
-              {meta.jobTitle ? `${meta.jobTitle} at ${meta.company}` : selectedJob ? `${selectedJob.title} at ${selectedJob.company}` : "Be honest — this drives your match score."}
+            <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"1rem",color:T.charcoal,margin:"0 0 0.2rem"}}>Rate Your Skills</h2>
+            <p style={{color:T.muted,fontSize:"0.75rem",margin:"0 0 0.9rem"}}>
+              {meta.jobTitle?`${meta.jobTitle} at ${meta.company}`:selJob?`${selJob.title} at ${selJob.company}`:"Be honest — this drives your match score."}
             </p>
-            {skills.length === 0 && selectedJob && (
-              <div style={{ padding:"1rem", background:T.tealLt, border:`1px solid ${T.teal}`, borderRadius:10, marginBottom:"1rem", textAlign:"center" }}>
-                <p style={{ color:T.muted, fontSize:"0.82rem", margin:"0 0 0.75rem" }}>Extracting skills from this job description...</p>
-                {loading ? <Spinner /> : (
-                  <Btn small onClick={async () => {
-                    setLoading(true);
-                    try {
-                      const raw = await callClaude([{ role:"user", content:P.jdAnalysis(selectedJob.description).msg }], P.jdAnalysis(selectedJob.description).sys);
-                      const parsed = JSON.parse(raw.replace(/```json|```/g,"").trim());
-                      setSkills(parsed.skills||[]);
-                      setMeta({ jobTitle:parsed.jobTitle||selectedJob.title, company:parsed.company||selectedJob.company, seniority:parsed.seniorityLevel||"", roleType:parsed.roleType||"", topPriority:parsed.topPriority||"" });
-                      setJd(selectedJob.description);
-                    } catch { setError("Paste the full JD manually for best results."); }
-                    setLoading(false);
-                  }}>Extract Skills →</Btn>
-                )}
-              </div>
+            {skills.length===0&&selJob&&(
+              <SurfaceCard style={{textAlign:"center",marginBottom:"1rem"}}>
+                <p style={{color:T.muted,fontSize:"0.82rem",margin:"0 0 0.75rem"}}>Extracting skills from this job description...</p>
+                {loading?<Spinner/>:<Btn small onClick={async()=>{
+                  setLoad(true);
+                  try {
+                    const raw=await callClaude([{role:"user",content:P.jd(selJob.description).msg}],P.jd(selJob.description).sys);
+                    const parsed=JSON.parse(raw.replace(/```json|```/g,"").trim());
+                    setSkills(parsed.skills||[]);
+                    setMeta({jobTitle:parsed.jobTitle||selJob.title,company:parsed.company||selJob.company,seniority:parsed.seniorityLevel||"",roleType:parsed.roleType||"",topPriority:parsed.topPriority||""});
+                    setJd(selJob.description);
+                  } catch { setError("Paste the full JD manually for best results."); }
+                  setLoad(false);
+                }}>Extract Skills →</Btn>}
+              </SurfaceCard>
             )}
-            {meta.topPriority && (
-              <div style={{ padding:"0.5rem 0.85rem", background:T.terraLt, border:`1px solid ${T.terra}`, borderRadius:8, marginBottom:"0.9rem", fontSize:"0.75rem", color:T.terraDk }}>
+            {meta.topPriority&&(
+              <div style={{padding:"0.5rem 0.85rem",background:T.goldLt,border:`1px solid ${T.gold}`,borderRadius:8,marginBottom:"0.9rem",fontSize:"0.75rem",color:T.goldDk}}>
                 ★ Top priority for this role: {meta.topPriority}
               </div>
             )}
-            {skills.map(s => <SkillRow key={s} skill={s} rating={ratings[s]||0} onChange={v => setRatings(r => ({...r,[s]:v}))} isTop={s===meta.topPriority} />)}
-            {skills.length > 0 && (
-              <div style={{ display:"flex", justifyContent:"space-between", marginTop:"1rem" }}>
-                <Btn variant="secondary" onClick={() => setPhase(PHASE.HOME)}>← Back</Btn>
-                <div style={{ display:"flex", alignItems:"center", gap:"1rem" }}>
-                  {loading && <Spinner />}
-                  <Btn onClick={getRecommendation} disabled={loading||skills.some(s=>!ratings[s])}>{loading?"Scoring...":"See My Match Score →"}</Btn>
+            {skills.map((s,i)=><SkillRow key={s} skill={s} rating={ratings[s]||0} onChange={v=>setRatings(r=>({...r,[s]:v}))} isTop={s===meta.topPriority}/>)}
+            {skills.length>0&&(
+              <div style={{display:"flex",justifyContent:"space-between",marginTop:"1rem"}}>
+                <Btn variant="secondary" onClick={()=>setPhase(PH.HOME)}>← Back</Btn>
+                <div style={{display:"flex",alignItems:"center",gap:"1rem"}}>
+                  {loading&&<Spinner/>}
+                  <Btn onClick={getRec} disabled={loading||skills.some(s=>!ratings[s])}>{loading?"Scoring...":"See My Match Score →"}</Btn>
                 </div>
               </div>
             )}
@@ -787,14 +925,14 @@ export default function App() {
         )}
 
         {/* RECOMMENDATION */}
-        {phase === PHASE.REC && (
+        {phase===PH.REC&&(
           <Card>
-            <h2 style={{ fontFamily:"'Syne',sans-serif", fontSize:"1rem", color:T.teal, margin:"0 0 0.9rem" }}>Your Match Score</h2>
-            <div style={{ background:T.bg, borderRadius:10, padding:"1rem", marginBottom:"1rem", border:`1px solid ${T.border}` }}><MD text={recommendation} /></div>
-            <div style={{ display:"flex", justifyContent:"space-between" }}>
-              <Btn variant="secondary" onClick={() => setPhase(PHASE.SKILLS)}>← Adjust Ratings</Btn>
-              <div style={{ display:"flex", alignItems:"center", gap:"1rem" }}>
-                {loading && <Spinner />}
+            <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"1rem",color:T.charcoal,margin:"0 0 0.9rem"}}>Your Match Score</h2>
+            <div style={{background:T.card,borderRadius:10,padding:"1rem",marginBottom:"1rem",border:`1px solid ${T.border}`}}><MD text={rec}/></div>
+            <div style={{display:"flex",justifyContent:"space-between"}}>
+              <Btn variant="secondary" onClick={()=>setPhase(PH.SKILLS)}>← Adjust</Btn>
+              <div style={{display:"flex",alignItems:"center",gap:"1rem"}}>
+                {loading&&<Spinner/>}
                 <Btn onClick={tailorResume} disabled={loading}>{loading?"Generating...":"Tailor My Resume →"}</Btn>
               </div>
             </div>
@@ -802,17 +940,22 @@ export default function App() {
         )}
 
         {/* RESUME */}
-        {phase === PHASE.RESUME && (
+        {phase===PH.RESUME&&(
           <Card>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"0.9rem" }}>
-              <h2 style={{ fontFamily:"'Syne',sans-serif", fontSize:"1rem", color:T.teal, margin:0 }}>Tailored Resume</h2>
-              <button onClick={() => navigator.clipboard.writeText(resume)} style={{ background:T.tealLt, border:`1px solid ${T.border}`, borderRadius:7, padding:"3px 9px", color:T.teal, fontSize:"0.7rem", cursor:"pointer" }}>📋 Copy</button>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"0.9rem"}}>
+              <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"1rem",color:T.charcoal,margin:0}}>Tailored Resume</h2>
+              <button onClick={()=>navigator.clipboard.writeText(resume)}
+                style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:7,padding:"3px 9px",color:T.muted,fontSize:"0.7rem",cursor:"pointer",transition:"all 0.15s"}}
+                onMouseEnter={e=>{e.currentTarget.style.background=T.charcoal;e.currentTarget.style.color="#fff";}}
+                onMouseLeave={e=>{e.currentTarget.style.background=T.card;e.currentTarget.style.color=T.muted;}}>
+                📋 Copy
+              </button>
             </div>
-            <PreBox text={resume} />
-            <div style={{ display:"flex", justifyContent:"space-between", marginTop:"1rem" }}>
-              <Btn variant="secondary" onClick={() => setPhase(PHASE.REC)}>← Back</Btn>
-              <div style={{ display:"flex", alignItems:"center", gap:"1rem" }}>
-                {loading && <Spinner />}
+            <PreBox text={resume}/>
+            <div style={{display:"flex",justifyContent:"space-between",marginTop:"1rem"}}>
+              <Btn variant="secondary" onClick={()=>setPhase(PH.REC)}>← Back</Btn>
+              <div style={{display:"flex",alignItems:"center",gap:"1rem"}}>
+                {loading&&<Spinner/>}
                 <Btn onClick={runATS} disabled={loading}>{loading?"Reviewing...":"Run ATS Review →"}</Btn>
               </div>
             </div>
@@ -820,29 +963,29 @@ export default function App() {
         )}
 
         {/* ATS */}
-        {phase === PHASE.ATS && (
+        {phase===PH.ATS&&(
           <>
-            {atsScore !== null && (
-              <div style={{ display:"flex", alignItems:"center", gap:"1.5rem", background:T.card, border:`1px solid ${T.border}`, borderRadius:16, padding:"1.1rem 1.3rem", marginBottom:"0.9rem" }}>
-                <ScoreDial score={atsScore} />
+            {atsScore!==null&&(
+              <SurfaceCard delay={0} style={{display:"flex",alignItems:"center",gap:"1.5rem",marginBottom:"0.9rem"}}>
+                <ScoreDial score={atsScore}/>
                 <div>
-                  <div style={{ fontFamily:"'Syne',sans-serif", fontSize:"1.05rem", fontWeight:800, color:T.teal }}>
-                    ATS Score: {atsScore>=75?"Strong":"Strengthen before applying"}
+                  <div style={{fontFamily:"'Syne',sans-serif",fontSize:"1rem",fontWeight:800,color:T.charcoal}}>
+                    ATS Score: {atsScore>=75?"Strong":atsScore>=55?"Good foundation":"Build this before applying"}
                   </div>
-                  <div style={{ color:T.muted, fontSize:"0.76rem" }}>
-                    {atsScore>=75?"Well-optimised for most ATS systems.":atsScore>=55?"A few targeted updates will improve your chances significantly.":"Focus on the keyword and structure suggestions below before applying."}
+                  <div style={{color:T.muted,fontSize:"0.76rem",marginTop:"0.25rem"}}>
+                    {atsScore>=75?"Well-optimised for most ATS systems.":atsScore>=55?"A few keyword additions will lift this significantly.":"The improvements below will make a real difference."}
                   </div>
                 </div>
-              </div>
+              </SurfaceCard>
             )}
             <Card>
-              <h2 style={{ fontFamily:"'Syne',sans-serif", fontSize:"1rem", color:T.teal, margin:"0 0 0.9rem" }}>ATS & Hiring Manager Review</h2>
-              <div style={{ background:T.bg, borderRadius:10, padding:"1rem", border:`1px solid ${T.border}` }}><MD text={atsReview} /></div>
-              <div style={{ display:"flex", justifyContent:"space-between", marginTop:"1rem" }}>
-                <Btn variant="secondary" onClick={() => setPhase(PHASE.RESUME)}>← Resume</Btn>
-                <div style={{ display:"flex", alignItems:"center", gap:"1rem" }}>
-                  {loading && <Spinner />}
-                  <Btn variant="terra" onClick={generateCL} disabled={loading}>{loading?"Writing...":"Generate Cover Letter →"}</Btn>
+              <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"1rem",color:T.charcoal,margin:"0 0 0.9rem"}}>ATS & Hiring Manager Review</h2>
+              <div style={{background:T.card,borderRadius:10,padding:"1rem",border:`1px solid ${T.border}`}}><MD text={atsReview}/></div>
+              <div style={{display:"flex",justifyContent:"space-between",marginTop:"1rem"}}>
+                <Btn variant="secondary" onClick={()=>setPhase(PH.RESUME)}>← Resume</Btn>
+                <div style={{display:"flex",alignItems:"center",gap:"1rem"}}>
+                  {loading&&<Spinner/>}
+                  <Btn variant="gold" onClick={genCL} disabled={loading}>{loading?"Writing...":"Generate Cover Letter →"}</Btn>
                 </div>
               </div>
             </Card>
@@ -850,107 +993,238 @@ export default function App() {
         )}
 
         {/* COVER LETTER */}
-        {phase === PHASE.CL && (
+        {phase===PH.CL&&(
           <Card>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"0.9rem" }}>
-              <h2 style={{ fontFamily:"'Syne',sans-serif", fontSize:"1rem", color:T.teal, margin:0 }}>Cover Letter</h2>
-              <button onClick={() => navigator.clipboard.writeText(coverLetter)} style={{ background:T.tealLt, border:`1px solid ${T.border}`, borderRadius:7, padding:"3px 9px", color:T.teal, fontSize:"0.7rem", cursor:"pointer" }}>📋 Copy</button>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"0.9rem"}}>
+              <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"1rem",color:T.charcoal,margin:0}}>Cover Letter</h2>
+              <button onClick={()=>navigator.clipboard.writeText(cl)}
+                style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:7,padding:"3px 9px",color:T.muted,fontSize:"0.7rem",cursor:"pointer",transition:"all 0.15s"}}
+                onMouseEnter={e=>{e.currentTarget.style.background=T.charcoal;e.currentTarget.style.color="#fff";}}
+                onMouseLeave={e=>{e.currentTarget.style.background=T.card;e.currentTarget.style.color=T.muted;}}>
+                📋 Copy
+              </button>
             </div>
-            <PreBox text={coverLetter} />
-            <div style={{ marginTop:"0.9rem", padding:"0.7rem 0.9rem", background:T.tealLt, border:`1px solid ${T.teal}`, borderRadius:9 }}>
-              <p style={{ color:T.teal, fontSize:"0.78rem", fontWeight:600, margin:"0 0 0.15rem" }}>✓ Application package complete!</p>
-              <p style={{ color:T.muted, fontSize:"0.73rem", margin:0 }}>Resume and cover letter tailored for {meta.jobTitle} at {meta.company}.</p>
+            <PreBox text={cl}/>
+            <div style={{marginTop:"0.9rem",padding:"0.75rem 1rem",background:T.goldLt,border:`1px solid ${T.gold}`,borderRadius:9}}>
+              <p style={{color:T.goldDk,fontSize:"0.78rem",fontWeight:600,margin:"0 0 0.15rem"}}>✓ Application package complete!</p>
+              <p style={{color:T.muted,fontSize:"0.73rem",margin:0}}>Resume and cover letter tailored for {meta.jobTitle} at {meta.company}.</p>
             </div>
-            <div style={{ display:"flex", justifyContent:"space-between", marginTop:"0.9rem" }}>
-              <Btn variant="secondary" onClick={() => setPhase(PHASE.ATS)}>← ATS Review</Btn>
-              <Btn onClick={() => setPhase(PHASE.HOME)}>Back to Home →</Btn>
+            <div style={{display:"flex",justifyContent:"space-between",marginTop:"0.9rem"}}>
+              <Btn variant="secondary" onClick={()=>setPhase(PH.ATS)}>← ATS Review</Btn>
+              <Btn onClick={()=>setPhase(PH.HOME)}>Back to Home →</Btn>
             </div>
           </Card>
         )}
 
-        {/* HR DASHBOARD */}
-        {phase === PHASE.HR && (
-          <div style={{ animation:"fadeUp 0.3s ease forwards" }}>
-            {!selectedCandidate ? (
-              <Card>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"1rem" }}>
+        {/* ═══ COMPANY PROFILE ═══ */}
+        {phase===PH.CO_PROFILE&&(
+          <Card>
+            <SectionHeader step={1} title="Set up your company profile"/>
+            <Input label="Company Name *" value={coName} onChange={setCoName} placeholder="e.g. Zepto, McKinsey India"/>
+            <Select label="Industry *" value={coIndustry} onChange={setCoIndustry} options={INDUSTRIES} placeholder="Select your industry"/>
+            <Select label="Company Size" value={coSize} onChange={setCoSize} options={CO_SIZES} placeholder="Select headcount"/>
+            <Input label="Company Website" value={coWebsite} onChange={setCoWebsite} placeholder="https://yourcompany.com" optional/>
+            <Input label="Your Name (Hiring Contact)" value={coContact} onChange={setCoContact} placeholder="e.g. Rahul Sharma" optional/>
+            <div style={{display:"flex",justifyContent:"flex-end",alignItems:"center",gap:"1rem"}}>
+              {loading&&<Spinner/>}
+              <Btn onClick={saveCoProfile} disabled={loading||!coName.trim()||!coIndustry}>{loading?"Saving...":"Go to Dashboard →"}</Btn>
+            </div>
+          </Card>
+        )}
+
+        {/* ═══ COMPANY HOME ═══ */}
+        {phase===PH.CO_HOME&&(
+          <div style={{animation:"fadeIn 0.3s ease"}}>
+            {/* header */}
+            <div style={{background:T.charcoal,borderRadius:14,padding:"1rem 1.25rem",marginBottom:"1.25rem",display:"flex",alignItems:"center",justifyContent:"space-between",animation:"fadeUp 0.3s ease"}}>
+              <div style={{display:"flex",alignItems:"center",gap:"0.75rem"}}>
+                <div style={{width:38,height:38,borderRadius:8,background:T.gold,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:700,fontSize:"1rem"}}>
+                  {(coProfile?.company_name||"C")[0].toUpperCase()}
+                </div>
+                <div>
+                  <div style={{color:"#fff",fontSize:"0.9rem",fontWeight:600}}>{coProfile?.company_name}</div>
+                  <div style={{color:"rgba(255,255,255,0.55)",fontSize:"0.72rem"}}>{coProfile?.industry} · {coProfile?.company_size}</div>
+                </div>
+              </div>
+              <Btn small variant="gold" onClick={()=>setPhase(PH.CO_POST)}>+ Post a Role</Btn>
+            </div>
+
+            {/* stats */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0.75rem",marginBottom:"1.25rem"}}>
+              {[
+                {label:"Roles posted",value:coJobs.length,color:T.charcoal},
+                {label:"Applications",value:candidates.length,color:T.gold},
+                {label:"Avg score",value:candidates.length?Math.round(candidates.reduce((a,c)=>a+(c.match_score||0),0)/candidates.length)+"%":"—",color:T.charcoal},
+              ].map(({label,value,color},i)=>(
+                <SurfaceCard key={label} delay={i*0.05} style={{textAlign:"center"}}>
+                  <p style={{fontFamily:"'Syne',sans-serif",fontSize:"1.4rem",fontWeight:800,color,margin:"0 0 4px"}}>{value}</p>
+                  <p style={{fontSize:"0.72rem",color:T.muted,margin:0}}>{label}</p>
+                </SurfaceCard>
+              ))}
+            </div>
+
+            {/* active roles */}
+            <Card delay={0.1} style={{marginBottom:"1rem"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
+                <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"1rem",color:T.charcoal,margin:0}}>Active Roles</h2>
+                <Btn small variant="secondary" onClick={()=>loadCoJobs(user.id)}>↻ Refresh</Btn>
+              </div>
+              {coJobs.length===0?(
+                <div style={{textAlign:"center",padding:"1.5rem",color:T.muted,fontSize:"0.84rem"}}>Post your first role to start receiving pre-scored candidates.</div>
+              ):coJobs.map((job,i)=>(
+                <div key={job.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0.8rem 1rem",border:`1px solid ${T.border}`,borderRadius:10,marginBottom:"0.5rem",background:T.card,transition:"all 0.2s",animation:`slideRight 0.3s ease ${i*0.05}s both`}}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor=T.charcoal;e.currentTarget.style.transform="translateX(3px)";}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.transform="translateX(0)";}}>
                   <div>
-                    <h2 style={{ fontFamily:"'Syne',sans-serif", fontSize:"1.1rem", color:T.teal, margin:"0 0 0.2rem" }}>HR Dashboard</h2>
-                    <p style={{ color:T.muted, fontSize:"0.75rem", margin:0 }}>Candidate Pipeline · {candidates.length} assessed</p>
+                    <p style={{fontSize:"0.87rem",fontWeight:600,color:T.text,margin:"0 0 3px"}}>{job.title}</p>
+                    <p style={{fontSize:"0.73rem",color:T.muted,margin:0}}>{job.location||"Location not set"} · {job.job_type||"Full-time"}</p>
                   </div>
-                  <Btn small onClick={loadCandidates}>↻ Refresh</Btn>
-                </div>
-                <div style={{ padding:"0.6rem 0.9rem", background:T.terraLt, border:`1px solid ${T.terra}`, borderRadius:8, marginBottom:"1rem", fontSize:"0.74rem", color:T.terraDk }}>
-                  Every outcome you log makes the EasyJob prediction engine more accurate.
-                </div>
-                {candidates.length === 0 ? (
-                  <div style={{ textAlign:"center", padding:"2rem", color:T.muted, fontSize:"0.84rem" }}>Candidate assessments will appear here as seekers complete their skill ratings.</div>
-                ) : (
-                  candidates.map(c => (
-                    <div key={c.id} onClick={() => setSelectedCandidate(c)} style={{ display:"flex", alignItems:"center", gap:"1rem", padding:"0.8rem 0.9rem", border:`1px solid ${T.border}`, borderRadius:12, marginBottom:"0.5rem", cursor:"pointer", background:T.card, transition:"all 0.15s" }}
-                      onMouseOver={e => { e.currentTarget.style.background=T.tealLt; e.currentTarget.style.borderColor=T.teal; }}
-                      onMouseOut={e => { e.currentTarget.style.background=T.card; e.currentTarget.style.borderColor=T.border; }}>
-                      <div style={{ width:38, height:38, borderRadius:"50%", background:T.tealLt, display:"flex", alignItems:"center", justifyContent:"center", color:T.teal, fontWeight:700, flexShrink:0 }}>
-                        {(c.users?.full_name||c.users?.email||"?")[0].toUpperCase()}
-                      </div>
-                      <div style={{ flex:1 }}>
-                        <div style={{ color:T.text, fontSize:"0.86rem", fontWeight:600 }}>{c.users?.full_name||c.users?.email||"Anonymous"}</div>
-                        <div style={{ color:T.muted, fontSize:"0.73rem" }}>{c.role_target} · {new Date(c.created_at).toLocaleDateString("en-IN")}</div>
-                      </div>
-                      <div style={{ textAlign:"right" }}>
-                        <div style={{ fontFamily:"'Syne',sans-serif", fontSize:"1.1rem", fontWeight:800, color:c.match_score>=75?T.teal:c.match_score>=55?T.terra:T.muted }}>{c.match_score||"—"}</div>
-                        <div style={{ fontSize:"0.62rem", color:T.muted }}>score</div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </Card>
-            ) : (
-              <Card>
-                <button onClick={() => setSelectedCandidate(null)} style={{ background:T.tealLt, border:`1px solid ${T.border}`, borderRadius:6, padding:"4px 10px", color:T.teal, fontSize:"0.72rem", cursor:"pointer", marginBottom:"1rem" }}>← Pipeline</button>
-                <div style={{ display:"flex", alignItems:"center", gap:"1rem", marginBottom:"1.1rem" }}>
-                  <div style={{ width:46, height:46, borderRadius:"50%", background:T.tealLt, display:"flex", alignItems:"center", justifyContent:"center", color:T.teal, fontWeight:700, fontSize:"1rem" }}>
-                    {(selectedCandidate.users?.full_name||"?")[0].toUpperCase()}
-                  </div>
-                  <div>
-                    <div style={{ color:T.text, fontSize:"0.95rem", fontWeight:600 }}>{selectedCandidate.users?.full_name||selectedCandidate.users?.email}</div>
-                    <div style={{ color:T.muted, fontSize:"0.75rem" }}>Applied for {selectedCandidate.role_target}</div>
-                  </div>
-                  <div style={{ marginLeft:"auto", textAlign:"right" }}>
-                    <div style={{ fontFamily:"'Syne',sans-serif", fontSize:"1.4rem", fontWeight:800, color:T.teal }}>{selectedCandidate.match_score||"—"}</div>
-                    <div style={{ fontSize:"0.62rem", color:T.muted }}>match score</div>
+                  <div style={{display:"flex",alignItems:"center",gap:"0.5rem"}}>
+                    <DarkTag>{job.status}</DarkTag>
+                    <Btn small onClick={()=>{ setSelCoJob(job); setPhase(PH.CO_PIPELINE); }}>Pipeline →</Btn>
                   </div>
                 </div>
-                <div style={{ marginBottom:"1.1rem" }}>
-                  <div style={{ color:T.muted, fontSize:"0.7rem", fontWeight:600, textTransform:"uppercase", marginBottom:"0.5rem" }}>Self-Assessed Skills</div>
-                  <div style={{ display:"flex", flexWrap:"wrap", gap:"0.35rem" }}>
-                    {Object.entries(selectedCandidate.skills||{}).map(([skill,rating]) => (
-                      <span key={skill} style={{ padding:"3px 10px", borderRadius:20, fontSize:"0.73rem", background:T.tealLt, color:T.teal }}>{skill}: {rating}/5</span>
-                    ))}
-                  </div>
+              ))}
+            </Card>
+
+            {/* pipeline preview */}
+            <Card delay={0.15}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
+                <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"1rem",color:T.charcoal,margin:0}}>Top Candidates</h2>
+                <div style={{display:"flex",gap:"0.5rem"}}>
+                  <Btn small variant="secondary" onClick={loadCandidates}>↻</Btn>
+                  <Btn small variant="gold" onClick={()=>setPhase(PH.CO_PIPELINE)}>View All →</Btn>
                 </div>
-                <div style={{ color:T.muted, fontSize:"0.7rem", fontWeight:600, textTransform:"uppercase", marginBottom:"0.5rem" }}>Log Outcome</div>
-                <div style={{ display:"flex", gap:"0.5rem", flexWrap:"wrap" }}>
+              </div>
+              {candidates.length===0?(
+                <div style={{textAlign:"center",padding:"1rem",color:T.muted,fontSize:"0.84rem"}}>Candidate assessments appear here as seekers complete applications.</div>
+              ):[...candidates].sort((a,b)=>(b.match_score||0)-(a.match_score||0)).slice(0,3).map((c,i)=>(
+                <CandidateRow key={c.id} c={c} rank={i} delay={i*0.06}
+                  onClick={()=>{ setSelCand(c); setPhase(PH.CO_CANDIDATE); }}/>
+              ))}
+              {/* AI insight strip */}
+              {candidates.length>0&&(
+                <div style={{marginTop:"0.75rem",padding:"0.75rem 1rem",background:T.goldLt,borderLeft:`3px solid ${T.gold}`,borderRadius:"0 8px 8px 0"}}>
+                  <p style={{fontSize:"0.72rem",color:T.gold,margin:"0 0 3px",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em"}}>AI insight</p>
+                  <p style={{fontSize:"0.78rem",color:T.goldDk,margin:0,lineHeight:1.6}}>
+                    {candidates.filter(c=>(c.match_score||0)>=75).length} candidates score above 75%. Consider adding a skill test to differentiate the top tier.
+                  </p>
+                </div>
+              )}
+            </Card>
+          </div>
+        )}
+
+        {/* ═══ POST A JOB ═══ */}
+        {phase===PH.CO_POST&&(
+          <div style={{animation:"fadeUp 0.3s ease"}}>
+            <NavStrip label="Company Dashboard" onBack={()=>setPhase(PH.CO_HOME)}/>
+            <Card>
+              <SectionHeader step={1} title="Post a new role"/>
+              <Input label="Job Title *" value={jpTitle} onChange={setJpTitle} placeholder="e.g. Senior Data Analyst"/>
+              <TA label="Job Description *" value={jpJD} onChange={setJpJD} rows={10}
+                placeholder="Paste the full job description including responsibilities, requirements, and what you offer..."/>
+              <Input label="Location" value={jpLoc} onChange={setJpLoc} placeholder="e.g. Hyderabad, Remote, Hybrid"/>
+              <Select label="Job Type" value={jpType} onChange={setJpType} options={JOB_TYPES} placeholder="Select job type"/>
+              <Input label="Salary Range" value={jpSalary} onChange={setJpSalary} placeholder="e.g. ₹18–25 LPA" optional/>
+              <Input label="Application Deadline" value={jpDeadline} onChange={setJpDeadline} placeholder="" type="date" optional/>
+              <div style={{padding:"0.75rem 1rem",background:T.card,border:`1px solid ${T.border}`,borderRadius:8,marginBottom:"1rem",fontSize:"0.78rem",color:T.muted}}>
+                Skill tests for this role can be added from the pipeline view after publishing.
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between"}}>
+                <Btn variant="secondary" onClick={()=>setPhase(PH.CO_HOME)}>← Back</Btn>
+                <div style={{display:"flex",alignItems:"center",gap:"1rem"}}>
+                  {loading&&<Spinner/>}
+                  <Btn onClick={postJob} disabled={loading||!jpTitle.trim()||!jpJD.trim()}>{loading?"Publishing...":"Publish Role →"}</Btn>
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* ═══ PIPELINE ═══ */}
+        {phase===PH.CO_PIPELINE&&(
+          <div style={{animation:"fadeUp 0.3s ease"}}>
+            <NavStrip label="Company Dashboard" onBack={()=>setPhase(PH.CO_HOME)}/>
+            <Card>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
+                <div>
+                  <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"1rem",color:T.charcoal,margin:"0 0 0.2rem"}}>
+                    {selCoJob?`Pipeline — ${selCoJob.title}`:"All Candidates"}
+                  </h2>
+                  <p style={{color:T.muted,fontSize:"0.75rem",margin:0}}>{candidates.length} assessed · sorted by score</p>
+                </div>
+                <Btn small variant="secondary" onClick={loadCandidates}>↻ Refresh</Btn>
+              </div>
+              <div style={{padding:"0.6rem 0.9rem",background:T.goldLt,border:`1px solid ${T.gold}`,borderRadius:8,marginBottom:"1rem",fontSize:"0.74rem",color:T.goldDk}}>
+                Every outcome you log improves EasyJob's prediction accuracy for your next hire.
+              </div>
+              {candidates.length===0?(
+                <div style={{textAlign:"center",padding:"2rem",color:T.muted,fontSize:"0.84rem"}}>
+                  Candidate assessments appear here as seekers complete their skill ratings.
+                </div>
+              ):[...candidates].sort((a,b)=>(b.match_score||0)-(a.match_score||0)).map((c,i)=>(
+                <CandidateRow key={c.id} c={c} rank={i} delay={i*0.04}
+                  onClick={()=>{ setSelCand(c); setPhase(PH.CO_CANDIDATE); }}/>
+              ))}
+            </Card>
+          </div>
+        )}
+
+        {/* ═══ CANDIDATE DETAIL ═══ */}
+        {phase===PH.CO_CANDIDATE&&selCand&&(
+          <div style={{animation:"fadeUp 0.3s ease"}}>
+            <NavStrip label="Pipeline" onBack={()=>setPhase(PH.CO_PIPELINE)}/>
+            <Card>
+              <div style={{display:"flex",alignItems:"center",gap:"1rem",marginBottom:"1.25rem"}}>
+                <div style={{width:50,height:50,borderRadius:"50%",background:T.card,display:"flex",alignItems:"center",justifyContent:"center",color:T.charcoal,fontWeight:700,fontSize:"1.1rem",border:`2px solid ${T.charcoal}`}}>
+                  {(selCand.users?.full_name||"?")[0].toUpperCase()}
+                </div>
+                <div style={{flex:1}}>
+                  <p style={{fontSize:"0.95rem",fontWeight:600,color:T.text,margin:"0 0 2px"}}>{selCand.users?.full_name||selCand.users?.email}</p>
+                  <p style={{fontSize:"0.75rem",color:T.muted,margin:0}}>Applied for {selCand.role_target}</p>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <p style={{fontFamily:"'Syne',sans-serif",fontSize:"1.8rem",fontWeight:800,color:selCand.match_score>=75?T.charcoal:T.gold,margin:0}}>{selCand.match_score||"—"}</p>
+                  <p style={{fontSize:"0.62rem",color:T.muted,margin:0}}>match score</p>
+                </div>
+              </div>
+
+              <div style={{marginBottom:"1.1rem"}}>
+                <p style={{color:T.muted,fontSize:"0.7rem",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"0.5rem"}}>Self-Assessed Skills</p>
+                <div style={{display:"flex",flexWrap:"wrap",gap:"0.35rem"}}>
+                  {Object.entries(selCand.skills||{}).map(([skill,rating])=>(
+                    <span key={skill} style={{padding:"3px 10px",borderRadius:20,fontSize:"0.73rem",background:T.card,color:T.text,border:`1px solid ${T.border}`}}>{skill}: {rating}/5</span>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p style={{color:T.muted,fontSize:"0.7rem",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"0.5rem"}}>Log Outcome</p>
+                <div style={{display:"flex",gap:"0.5rem",flexWrap:"wrap"}}>
                   {[
-                    { label:"Interview", icon:"📞", val:"interview" },
-                    { label:"Shortlisted", icon:"⭐", val:"shortlisted" },
-                    { label:"Offer", icon:"🎉", val:"offer" },
-                    { label:"Another direction", icon:"→", val:"rejected" },
-                    { label:"No response", icon:"👻", val:"ghosted" },
-                  ].map(({ label, icon, val }) => (
-                    <button key={val} onClick={() => logOutcome(selectedCandidate.id, val)} style={{ padding:"6px 14px", borderRadius:8, border:`1px solid ${T.border}`, background:T.bg, color:T.text, fontSize:"0.76rem", cursor:"pointer", fontWeight:600 }}>
+                    {label:"Move to Interview",icon:"📞",val:"interview"},
+                    {label:"Shortlist",icon:"⭐",val:"shortlisted"},
+                    {label:"Offer Extended",icon:"🎉",val:"offer"},
+                    {label:"Another Direction",icon:"→",val:"rejected"},
+                    {label:"No Response",icon:"👻",val:"ghosted"},
+                  ].map(({label,icon,val})=>(
+                    <button key={val} onClick={()=>logOutcome(val)}
+                      style={{padding:"7px 14px",borderRadius:8,border:`1px solid ${T.border}`,background:T.cardHi,color:T.text,fontSize:"0.76rem",cursor:"pointer",fontWeight:500,transition:"all 0.15s"}}
+                      onMouseEnter={e=>{e.currentTarget.style.background=T.charcoal;e.currentTarget.style.color="#fff";e.currentTarget.style.borderColor=T.charcoal;}}
+                      onMouseLeave={e=>{e.currentTarget.style.background=T.cardHi;e.currentTarget.style.color=T.text;e.currentTarget.style.borderColor=T.border;}}>
                       {icon} {label}
                     </button>
                   ))}
                 </div>
-                <p style={{ color:T.muted, fontSize:"0.7rem", margin:"0.5rem 0 0" }}>Logging outcomes builds EasyJob's prediction accuracy over time.</p>
-              </Card>
-            )}
+                <p style={{color:T.muted,fontSize:"0.7rem",margin:"0.6rem 0 0"}}>Logging outcomes sends AI feedback to the candidate and improves EasyJob's predictions.</p>
+              </div>
+            </Card>
           </div>
         )}
 
-        <div ref={bottomRef} />
-        <p style={{ textAlign:"center", marginTop:"1.5rem", color:T.border, fontSize:"0.62rem", letterSpacing:"0.08em", textTransform:"uppercase" }}>EasyJob · Beta · Powered by Claude AI</p>
+        <div ref={bottomRef}/>
+        <p style={{textAlign:"center",marginTop:"1.5rem",color:T.border,fontSize:"0.62rem",letterSpacing:"0.08em",textTransform:"uppercase"}}>EasyJob · Beta · Powered by Claude AI</p>
       </div>
     </div>
   );
