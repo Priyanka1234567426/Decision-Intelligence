@@ -428,7 +428,19 @@ export default function App() {
   const [jpSalary,setJpSalary] = useState("");
   const [jpDeadline,setJpDeadline] = useState("");
 
+  const [profileOpen, setProfileOpen] = useState(false);
   const bottomRef = useRef(null);
+  const profileRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (profileRef.current && !profileRef.current.contains(e.target)) {
+        setProfileOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
   useEffect(()=>{ bottomRef.current?.scrollIntoView({behavior:"smooth"}); },[phase,loading]);
 
   useEffect(()=>{
@@ -621,7 +633,7 @@ export default function App() {
   function selectJob(job) {
     setSelJob(job); setJd(job.description);
     setMeta({jobTitle:job.title,company:job.company,seniority:"",roleType:"",topPriority:""});
-    setSkills([]); setRatings({});
+    setSkills([]); setRatings({}); setError("");
     setPhase(PH.JOB_DETAIL);
   }
 
@@ -699,19 +711,71 @@ export default function App() {
       <div style={{maxWidth:720,margin:"0 auto"}}>
 
         {/* HEADER */}
-        <header style={{textAlign:"center",marginBottom:"1.5rem",animation:"fadeDown 0.4s ease"}}>
-          <h1 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(1.6rem,5vw,2.2rem)",fontWeight:800,color:T.charcoal,margin:"0 0 0.2rem"}}>
-            Easy<span style={{color:T.gold}}>Job</span>
-          </h1>
-          <p style={{color:T.muted,fontSize:"0.8rem",margin:0}}>AI-Powered Career Intelligence · Global</p>
-          {user&&(
-            <button onClick={()=>supabase.auth.signOut()}
-              style={{marginTop:"0.6rem",background:"transparent",border:`1px solid ${T.border}`,borderRadius:20,padding:"5px 14px",color:T.muted,fontSize:"0.75rem",cursor:"pointer",transition:"all 0.15s"}}
-              onMouseEnter={e=>{e.currentTarget.style.background=T.charcoal;e.currentTarget.style.color="#fff";e.currentTarget.style.borderColor=T.charcoal;}}
-              onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color=T.muted;e.currentTarget.style.borderColor=T.border;}}>
-              Sign out
-            </button>
-          )}
+        <header style={{marginBottom:"1.5rem",animation:"fadeUp 0.3s ease"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0.75rem 1rem",background:T.cardHi,border:`1px solid ${T.border}`,borderRadius:14}}>
+            {/* logo */}
+            <h1 style={{fontFamily:"'Syne',sans-serif",fontSize:"1.5rem",fontWeight:800,color:T.charcoal,margin:0}}>
+              Easy<span style={{color:T.gold}}>Job</span>
+            </h1>
+
+            {/* subtitle — hidden on small screens */}
+            <p style={{color:T.muted,fontSize:"0.75rem",margin:0,display:"none"}}>AI-Powered Career Intelligence</p>
+
+            {/* right side */}
+            <div style={{display:"flex",alignItems:"center",gap:"0.75rem"}}>
+              {!user&&(
+                <Btn small onClick={()=>setPhase(PH.AUTH)}>Sign in</Btn>
+              )}
+              {user&&(
+                <div style={{position:"relative"}} ref={profileRef}>
+                  {/* avatar button */}
+                  <button onClick={()=>setProfileOpen(o=>!o)}
+                    style={{display:"flex",alignItems:"center",gap:8,background:profileOpen?T.charcoal:T.card,border:`1px solid ${profileOpen?T.charcoal:T.border}`,borderRadius:24,padding:"5px 12px 5px 6px",cursor:"pointer",transition:"all 0.2s"}}>
+                    <div style={{width:28,height:28,borderRadius:"50%",background:T.gold,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:700,fontSize:"0.78rem",flexShrink:0}}>
+                      {(candProfile?.full_name||coProfile?.company_name||user.email||"U")[0].toUpperCase()}
+                    </div>
+                    <span style={{fontSize:"0.78rem",fontWeight:600,color:profileOpen?"#fff":T.text,maxWidth:100,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                      {candProfile?.full_name||coProfile?.company_name||user.email?.split("@")[0]}
+                    </span>
+                    <span style={{fontSize:"0.65rem",color:profileOpen?"rgba(255,255,255,0.7)":T.muted,transition:"transform 0.2s",transform:profileOpen?"rotate(180deg)":"rotate(0)"}}>▼</span>
+                  </button>
+
+                  {/* dropdown */}
+                  {profileOpen&&(
+                    <div style={{position:"absolute",right:0,top:"calc(100% + 8px)",background:T.cardHi,border:`1px solid ${T.border}`,borderRadius:12,minWidth:200,boxShadow:"0 8px 24px rgba(0,0,0,0.12)",zIndex:999,animation:"scaleIn 0.15s ease",overflow:"hidden"}}>
+                      {/* user info */}
+                      <div style={{padding:"0.75rem 1rem",borderBottom:`1px solid ${T.border}`,background:T.card}}>
+                        <p style={{fontSize:"0.82rem",fontWeight:600,color:T.text,margin:"0 0 2px"}}>{candProfile?.full_name||coProfile?.company_name||"User"}</p>
+                        <p style={{fontSize:"0.72rem",color:T.muted,margin:"0 0 4px"}}>{user.email}</p>
+                        <span style={{background:T.goldLt,color:T.goldDk,fontSize:"0.65rem",fontWeight:600,padding:"2px 8px",borderRadius:20,border:`1px solid ${T.gold}`}}>
+                          {candProfile?"Candidate":coProfile?"Company":"—"}
+                        </span>
+                      </div>
+
+                      {/* menu items */}
+                      {[
+                        candProfile ? {label:"Edit Profile",icon:"✏️",action:()=>{ setDName(candProfile.full_name||""); setDBG(candProfile.background||""); setDSkills(candProfile.skills_summary||""); setDLoc(candProfile.preferred_location||""); setDSalary(candProfile.salary_expectation||""); setDBuckets(candProfile.buckets||[]); setProfileOpen(false); setPhase(PH.CAND_PROFILE); }} : null,
+                        candProfile ? {label:"My Job Interests",icon:"🎯",action:()=>{ setDBuckets(candProfile.buckets||[]); setProfileOpen(false); setPhase(PH.CAND_BUCKETS); }} : null,
+                        coProfile ? {label:"Company Profile",icon:"🏢",action:()=>{ setProfileOpen(false); setPhase(PH.CO_HOME); }} : null,
+                        coProfile ? {label:"Post a Role",icon:"➕",action:()=>{ setProfileOpen(false); setPhase(PH.CO_POST); }} : null,
+                        {label:"Home",icon:"🏠",action:()=>{ setProfileOpen(false); setPhase(candProfile?PH.HOME:PH.CO_HOME); }},
+                        {label:"Sign out",icon:"🚪",action:()=>{ setProfileOpen(false); supabase.auth.signOut(); }, danger:true},
+                      ].filter(Boolean).map((item,i)=>(
+                        <button key={i} onClick={item.action}
+                          style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"0.65rem 1rem",background:"transparent",border:"none",cursor:"pointer",textAlign:"left",borderBottom:i<4?`1px solid ${T.border}`:"none",transition:"background 0.15s"}}
+                          onMouseEnter={e=>e.currentTarget.style.background=item.danger?T.goldLt:T.card}
+                          onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                          <span style={{fontSize:"0.9rem"}}>{item.icon}</span>
+                          <span style={{fontSize:"0.82rem",fontWeight:500,color:item.danger?T.goldDk:T.text}}>{item.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+          <p style={{textAlign:"center",color:T.muted,fontSize:"0.72rem",margin:"0.4rem 0 0"}}>AI-Powered Career Intelligence · Global</p>
         </header>
 
         {/* ERROR */}
@@ -1005,15 +1069,30 @@ export default function App() {
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <Btn variant="secondary" onClick={()=>setPhase(PH.HOME)}>← Back to Jobs</Btn>
                 <Btn variant="gold" onClick={async()=>{
-                  setLoad(true);
+                  setLoad(true); setError("");
                   try {
-                    const raw = await callClaude([{role:"user",content:P.jd(selJob.description||selJob.title).msg}],P.jd(selJob.description||selJob.title).sys);
-                    const parsed = JSON.parse(raw.replace(/```json|```/g,"").trim());
-                    setSkills(parsed.skills||[]);
-                    setMeta({jobTitle:parsed.jobTitle||selJob.title,company:parsed.company||selJob.company,seniority:parsed.seniorityLevel||"",roleType:parsed.roleType||"",topPriority:parsed.topPriority||""});
-                  } catch { setError("Paste the full JD manually for best results."); }
+                    const jdText = selJob.description||selJob.title;
+                    const prompt = `Extract 7-9 key skills from this job: ${selJob.title} at ${selJob.company||""}. JD: ${jdText}. Respond ONLY in valid JSON with no markdown: {"jobTitle":"","company":"","seniorityLevel":"","skills":[],"roleType":"","topPriority":""}`;
+                    const raw = await callClaude(
+                      [{role:"user",content:prompt}],
+                      `You are a talent acquisition specialist. Always return valid JSON. If the JD is short, infer skills from the job title and seniority level. Never return an empty skills array.`
+                    );
+                    const cleaned = raw.replace(/```json|```/g,"").trim();
+                    const parsed = JSON.parse(cleaned);
+                    if (parsed.skills&&parsed.skills.length>0) {
+                      setSkills(parsed.skills);
+                      setMeta({jobTitle:parsed.jobTitle||selJob.title,company:parsed.company||selJob.company,seniority:parsed.seniorityLevel||"",roleType:parsed.roleType||"",topPriority:parsed.topPriority||""});
+                      setJd(jdText);
+                      setPhase(PH.SKILLS);
+                    } else {
+                      setError("Could not extract skills automatically. Use the manual JD option.");
+                      setPhase(PH.SKILLS);
+                    }
+                  } catch(e) {
+                    setError("Could not extract skills. Continuing to skill rating — you can still rate manually.");
+                    setPhase(PH.SKILLS);
+                  }
                   setLoad(false);
-                  setPhase(PH.SKILLS);
                 }} disabled={loading}>{loading?"Extracting skills...":"Analyse This Role →"}</Btn>
               </div>
             </Card>
@@ -1042,19 +1121,37 @@ export default function App() {
             </p>
             {skills.length===0&&selJob&&(
               <SurfaceCard style={{textAlign:"center",marginBottom:"1rem"}}>
-                <p style={{color:T.muted,fontSize:"0.82rem",margin:"0 0 0.75rem"}}>Extracting skills from this job description...</p>
+                <p style={{color:T.muted,fontSize:"0.82rem",margin:"0 0 0.75rem"}}>
+                  {loading?"Extracting skills from this job description...":"Ready to extract skills — click below to continue."}
+                </p>
                 {loading?<Spinner/>:<Btn small onClick={async()=>{
-                  setLoad(true);
+                  setLoad(true); setError("");
                   try {
-                    const raw=await callClaude([{role:"user",content:P.jd(selJob.description).msg}],P.jd(selJob.description).sys);
-                    const parsed=JSON.parse(raw.replace(/```json|```/g,"").trim());
-                    setSkills(parsed.skills||[]);
-                    setMeta({jobTitle:parsed.jobTitle||selJob.title,company:parsed.company||selJob.company,seniority:parsed.seniorityLevel||"",roleType:parsed.roleType||"",topPriority:parsed.topPriority||""});
-                    setJd(selJob.description);
-                  } catch { setError("Paste the full JD manually for best results."); }
+                    const jdText = selJob.description||selJob.title;
+                    const prompt = `Extract 7-9 key skills from this job: ${selJob.title} at ${selJob.company}. JD: ${jdText}. Respond ONLY in JSON: {"jobTitle":"","company":"","seniorityLevel":"","skills":[],"roleType":"","topPriority":""}`;
+                    const raw = await callClaude([{role:"user",content:prompt}],`You are a talent specialist. Extract skills from job descriptions. Always return valid JSON even if the JD is short — infer from the job title if needed.`);
+                    const cleaned = raw.replace(/```json|```/g,"").trim();
+                    const parsed = JSON.parse(cleaned);
+                    if (parsed.skills&&parsed.skills.length>0) {
+                      setSkills(parsed.skills);
+                      setMeta({jobTitle:parsed.jobTitle||selJob.title,company:parsed.company||selJob.company,seniority:parsed.seniorityLevel||"",roleType:parsed.roleType||"",topPriority:parsed.topPriority||""});
+                      setJd(jdText);
+                    } else {
+                      setError("Skills could not be extracted. Try pasting the full JD using the manual option below.");
+                    }
+                  } catch(e) {
+                    setError("Skills could not be extracted automatically. Use the manual JD option below.");
+                  }
                   setLoad(false);
                 }}>Extract Skills →</Btn>}
               </SurfaceCard>
+            )}
+            {skills.length===0&&selJob&&!loading&&(
+              <div style={{textAlign:"center",marginBottom:"0.75rem"}}>
+                <button onClick={()=>{setSelJob(null);setPhase(PH.JD);}} style={{background:"none",border:"none",color:T.gold,fontSize:"0.78rem",cursor:"pointer",textDecoration:"underline",fontFamily:"'DM Sans',sans-serif"}}>
+                  Paste the full JD manually instead →
+                </button>
+              </div>
             )}
             {meta.topPriority&&(
               <div style={{padding:"0.5rem 0.85rem",background:T.goldLt,border:`1px solid ${T.gold}`,borderRadius:8,marginBottom:"0.9rem",fontSize:"0.75rem",color:T.goldDk}}>
@@ -1064,7 +1161,7 @@ export default function App() {
             {skills.map((s,i)=><SkillRow key={s} skill={s} rating={ratings[s]||0} onChange={v=>setRatings(r=>({...r,[s]:v}))} isTop={s===meta.topPriority}/>)}
             {skills.length>0&&(
               <div style={{display:"flex",justifyContent:"space-between",marginTop:"1rem"}}>
-                <Btn variant="secondary" onClick={()=>setPhase(selJob?PH.JOB_DETAIL:PH.HOME)}>← Back</Btn>
+                <Btn variant="secondary" onClick={()=>{ setError(""); setPhase(selJob?PH.JOB_DETAIL:PH.HOME); }}>← Back to Job</Btn>
                 <div style={{display:"flex",alignItems:"center",gap:"1rem"}}>
                   {loading&&<Spinner/>}
                   <Btn onClick={getRec} disabled={loading||skills.some(s=>!ratings[s])}>{loading?"Scoring...":"See My Match Score →"}</Btn>
