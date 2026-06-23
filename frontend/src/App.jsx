@@ -79,7 +79,7 @@ const JOB_TYPES = ["Full-time","Part-time","Contract","Freelance","Internship"];
 
 /* ── phases ── */
 const PH = {
-  AUTH:"auth",
+  AUTH:"auth", ROLE_PICK:"role_pick",
   CAND_PROFILE:"cand_profile", CAND_BUCKETS:"cand_buckets", HOME:"home",
   JD:"jd", SKILLS:"skills", REC:"rec", RESUME:"resume", ATS:"ats", CL:"cl",
   CO_PROFILE:"co_profile", CO_HOME:"co_home", CO_POST:"co_post",
@@ -449,7 +449,7 @@ export default function App() {
   async function loadProfile(u) {
     try {
       const {data} = await supabase.from("users").select("*").eq("id",u.id).maybeSingle();
-      if (!data) { setPhase(PH.AUTH); return; }
+      if (!data || !data.user_role) { setPhase(PH.ROLE_PICK); return; }
       if (data.user_role==="company") {
         setCoProfile(data); loadCoJobs(data.id); loadCandidates(); setPhase(PH.CO_HOME);
       } else {
@@ -490,6 +490,29 @@ export default function App() {
     setLoad(true);
     const {error} = await supabase.auth.signInWithOAuth({provider:"google",options:{redirectTo:window.location.origin}});
     if (error) { setError(error.message); setLoad(false); }
+  }
+    async function saveRoleAndContinue(role) {
+    if (!user) return;
+    setLoad(true);
+    const { error } = await supabase.from("users").upsert(
+      { id:user.id, email:user.email, user_role:role },
+      { onConflict:"id" }
+    );
+    if (error) { setError(error.message); setLoad(false); return; }
+    setLoad(false);
+    if (role === "company") setPhase(PH.CO_PROFILE);
+    else setPhase(PH.CAND_PROFILE);
+  }
+
+  async function forgotPassword() {
+    if (!email) { setError("Enter your email address above first."); return; }
+    setLoad(true); setError("");
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin,
+    });
+    if (error) setError(error.message);
+    else setError("✓ Password reset link sent — check your inbox.");
+    setLoad(false);
   }
 
   async function emailAuth() {
@@ -732,6 +755,15 @@ export default function App() {
                 <Input label="Email" value={email} onChange={setEmail} placeholder="you@example.com" type="email"/>
                 <Input label="Password" value={password} onChange={setPassword} placeholder="••••••••" type="password"/>
               </div>
+              {authMode==="signin" && (
+                <div style={{textAlign:"right"}}>
+                  <button onClick={forgotPassword}
+                    style={{background:"none",border:"none",color:T.gold,fontSize:"0.78rem",
+                      cursor:"pointer",textDecoration:"underline",padding:0}}>
+                    Forgot password?
+                  </button>
+                </div>
+              )}
 
               {loading?<Spinner/>:<Btn full onClick={emailAuth}>
                 {authMode==="signin"?`Sign in as ${authPersona==="company"?"Company":"Candidate"} →`:`Create ${authPersona==="company"?"Company":"Candidate"} account →`}
@@ -752,7 +784,41 @@ export default function App() {
             </div>
           </Card>
         )}
-
+        {phase===PH.ROLE_PICK && (
+            <Card>
+              <div style={{textAlign:"center"}}>
+                <div style={{fontSize:"2rem",marginBottom:"0.75rem"}}>👋</div>
+                <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"1.2rem",
+                  color:T.charcoal,margin:"0 0 0.3rem"}}>One last step</h2>
+                <p style={{color:T.muted,fontSize:"0.83rem",margin:"0 0 1.5rem"}}>
+                  How will you use EasyJob?
+                </p>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.75rem",marginBottom:"1rem"}}>
+                  {[
+                    {id:"candidate",icon:"👤",label:"Candidate",desc:"Find jobs & get matched"},
+                    {id:"company",  icon:"🏢",label:"Company",  desc:"Post roles & hire talent"},
+                  ].map(({id,icon,label,desc}) => (
+                    <button key={id} onClick={()=>saveRoleAndContinue(id)}
+                      style={{border:`2px solid ${T.border}`,background:T.cardHi,
+                        borderRadius:12,padding:"1.25rem 0.75rem",cursor:"pointer",
+                        textAlign:"center",transition:"all 0.2s"}}
+                      onMouseEnter={e=>{e.currentTarget.style.borderColor=T.charcoal;
+                        e.currentTarget.style.background=T.card;}}
+                      onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;
+                        e.currentTarget.style.background=T.cardHi;}}>
+                      <div style={{fontSize:"1.75rem",marginBottom:8}}>{icon}</div>
+                      <p style={{fontSize:"0.9rem",fontWeight:600,color:T.text,margin:"0 0 4px"}}>{label}</p>
+                      <p style={{fontSize:"0.72rem",color:T.muted,margin:0}}>{desc}</p>
+                    </button>
+                  ))}
+                </div>
+                {loading && <Spinner/>}
+                <p style={{color:T.muted,fontSize:"0.72rem",marginTop:"0.75rem"}}>
+                  Signed in as {user?.email}
+                </p>
+              </div>
+            </Card>
+          )} 
         {/* ═══ CANDIDATE PROFILE ═══ */}
         {phase===PH.CAND_PROFILE&&(
           <Card>
