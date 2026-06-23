@@ -79,7 +79,7 @@ const JOB_TYPES = ["Full-time","Part-time","Contract","Freelance","Internship"];
 
 /* ── phases ── */
 const PH = {
-  AUTH:"auth", ROLE_PICK:"role_pick",
+  AUTH:"auth", ROLE_PICK:"role_pick", JOB_DETAIL:"job_detail",
   CAND_PROFILE:"cand_profile", CAND_BUCKETS:"cand_buckets", HOME:"home",
   JD:"jd", SKILLS:"skills", REC:"rec", RESUME:"resume", ATS:"ats", CL:"cl",
   CO_PROFILE:"co_profile", CO_HOME:"co_home", CO_POST:"co_post",
@@ -311,7 +311,7 @@ function DarkTag({children}) {
 }
 
 const FLOW_STEPS=[
-  {key:"jd",label:"Job",icon:"01"},{key:"skills",label:"Skills",icon:"02"},
+  {key:"job_detail",label:"Job",icon:"01"},{key:"skills",label:"Skills",icon:"02"},
   {key:"rec",label:"Match",icon:"03"},{key:"resume",label:"Resume",icon:"04"},
   {key:"ats",label:"ATS",icon:"05"},{key:"cl",label:"Cover",icon:"06"},
 ];
@@ -449,7 +449,11 @@ export default function App() {
   async function loadProfile(u) {
     try {
       const {data} = await supabase.from("users").select("*").eq("id",u.id).maybeSingle();
-      if (!data || !data.user_role) { setPhase(PH.ROLE_PICK); return; }
+      if (!data || !data.user_role) {
+        // Google OAuth user — no role set yet, send to role picker
+        setPhase(PH.ROLE_PICK);
+        return;
+      }
       if (data.user_role==="company") {
         setCoProfile(data); loadCoJobs(data.id); loadCandidates(); setPhase(PH.CO_HOME);
       } else {
@@ -464,7 +468,7 @@ export default function App() {
     setJobsLoading(true);
     const all=[];
     for (const bid of p.buckets.slice(0,3)) {
-      const fetched = await fetchJobs(BUCKET_TERMS[bid]||bid,"India");
+      const fetched = await fetchJobs(BUCKET_TERMS[bid]||bid, p.preferred_location||"India");
       for (const job of fetched) {
         job.matchScore = computeMatchScore(p.background,job);
         job.bucketLabel = BUCKETS.find(b=>b.id===bid)?.label||bid;
@@ -491,7 +495,27 @@ export default function App() {
     const {error} = await supabase.auth.signInWithOAuth({provider:"google",options:{redirectTo:window.location.origin}});
     if (error) { setError(error.message); setLoad(false); }
   }
-    async function saveRoleAndContinue(role) {
+
+  async function emailAuth() {
+    if (!email||!password) { setError("Please enter your email and password."); return; }
+    setLoad(true); setError("");
+    if (authMode==="signup") {
+      if (password.length<6) { setError("Choose a password with at least 6 characters."); setLoad(false); return; }
+      const {data,error} = await supabase.auth.signUp({email,password});
+      if (error) { setError(error.message); setLoad(false); return; }
+      if (data.user) {
+        await supabase.from("users").upsert({id:data.user.id,email:data.user.email,user_role:authPersona},{onConflict:"id"});
+        setUser(data.user);
+        setPhase(authPersona==="company"?PH.CO_PROFILE:PH.CAND_PROFILE);
+      } else { setError("Check your email to confirm your account, then sign in."); }
+    } else {
+      const {error} = await supabase.auth.signInWithPassword({email,password});
+      if (error) setError(error.message);
+    }
+    setLoad(false);
+  }
+
+  async function saveRoleAndContinue(role) {
     if (!user) return;
     setLoad(true);
     const { error } = await supabase.from("users").upsert(
@@ -512,25 +536,6 @@ export default function App() {
     });
     if (error) setError(error.message);
     else setError("✓ Password reset link sent — check your inbox.");
-    setLoad(false);
-  }
-
-  async function emailAuth() {
-    if (!email||!password) { setError("Please enter your email and password."); return; }
-    setLoad(true); setError("");
-    if (authMode==="signup") {
-      if (password.length<6) { setError("Choose a password with at least 6 characters."); setLoad(false); return; }
-      const {data,error} = await supabase.auth.signUp({email,password});
-      if (error) { setError(error.message); setLoad(false); return; }
-      if (data.user) {
-        await supabase.from("users").upsert({id:data.user.id,email:data.user.email,user_role:authPersona},{onConflict:"id"});
-        setUser(data.user);
-        setPhase(authPersona==="company"?PH.CO_PROFILE:PH.CAND_PROFILE);
-      } else { setError("Check your email to confirm your account, then sign in."); }
-    } else {
-      const {error} = await supabase.auth.signInWithPassword({email,password});
-      if (error) setError(error.message);
-    }
     setLoad(false);
   }
 
@@ -616,7 +621,8 @@ export default function App() {
   function selectJob(job) {
     setSelJob(job); setJd(job.description);
     setMeta({jobTitle:job.title,company:job.company,seniority:"",roleType:"",topPriority:""});
-    setPhase(PH.SKILLS); setSkills([]); setRatings({});
+    setSkills([]); setRatings({});
+    setPhase(PH.JOB_DETAIL);
   }
 
   /* ── company ── */
@@ -659,7 +665,7 @@ export default function App() {
     setSelCand(null); loadCandidates();
   }
 
-  const inFlow=[PH.JD,PH.SKILLS,PH.REC,PH.RESUME,PH.ATS,PH.CL].includes(phase);
+  const inFlow=[PH.JOB_DETAIL,PH.JD,PH.SKILLS,PH.REC,PH.RESUME,PH.ATS,PH.CL].includes(phase);
 
   /* ── shared nav strip ── */
   function NavStrip({label,onBack}) {
@@ -751,15 +757,17 @@ export default function App() {
                 ))}
               </div>
 
-              <div style={{display:"flex",flexDirection:"column",gap:"0.75rem",marginBottom:"1rem",textAlign:"left"}}>
+              <div style={{display:"flex",flexDirection:"column",gap:"0.75rem",marginBottom:"0.5rem",textAlign:"left"}}>
                 <Input label="Email" value={email} onChange={setEmail} placeholder="you@example.com" type="email"/>
                 <Input label="Password" value={password} onChange={setPassword} placeholder="••••••••" type="password"/>
               </div>
-              {authMode==="signin" && (
-                <div style={{textAlign:"right"}}>
+
+              {authMode==="signin"&&(
+                <div style={{textAlign:"right",marginBottom:"1rem"}}>
                   <button onClick={forgotPassword}
-                    style={{background:"none",border:"none",color:T.gold,fontSize:"0.78rem",
-                      cursor:"pointer",textDecoration:"underline",padding:0}}>
+                    style={{background:"none",border:"none",color:T.gold,fontSize:"0.78rem",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",textDecoration:"underline",padding:0}}
+                    onMouseEnter={e=>e.currentTarget.style.color=T.goldDk}
+                    onMouseLeave={e=>e.currentTarget.style.color=T.gold}>
                     Forgot password?
                   </button>
                 </div>
@@ -784,41 +792,42 @@ export default function App() {
             </div>
           </Card>
         )}
-        {phase===PH.ROLE_PICK && (
-            <Card>
-              <div style={{textAlign:"center"}}>
-                <div style={{fontSize:"2rem",marginBottom:"0.75rem"}}>👋</div>
-                <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"1.2rem",
-                  color:T.charcoal,margin:"0 0 0.3rem"}}>One last step</h2>
-                <p style={{color:T.muted,fontSize:"0.83rem",margin:"0 0 1.5rem"}}>
-                  How will you use EasyJob?
-                </p>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.75rem",marginBottom:"1rem"}}>
-                  {[
-                    {id:"candidate",icon:"👤",label:"Candidate",desc:"Find jobs & get matched"},
-                    {id:"company",  icon:"🏢",label:"Company",  desc:"Post roles & hire talent"},
-                  ].map(({id,icon,label,desc}) => (
-                    <button key={id} onClick={()=>saveRoleAndContinue(id)}
-                      style={{border:`2px solid ${T.border}`,background:T.cardHi,
-                        borderRadius:12,padding:"1.25rem 0.75rem",cursor:"pointer",
-                        textAlign:"center",transition:"all 0.2s"}}
-                      onMouseEnter={e=>{e.currentTarget.style.borderColor=T.charcoal;
-                        e.currentTarget.style.background=T.card;}}
-                      onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;
-                        e.currentTarget.style.background=T.cardHi;}}>
-                      <div style={{fontSize:"1.75rem",marginBottom:8}}>{icon}</div>
-                      <p style={{fontSize:"0.9rem",fontWeight:600,color:T.text,margin:"0 0 4px"}}>{label}</p>
-                      <p style={{fontSize:"0.72rem",color:T.muted,margin:0}}>{desc}</p>
-                    </button>
-                  ))}
-                </div>
-                {loading && <Spinner/>}
-                <p style={{color:T.muted,fontSize:"0.72rem",marginTop:"0.75rem"}}>
-                  Signed in as {user?.email}
-                </p>
+
+        {/* ═══ ROLE PICKER — Google OAuth users ═══ */}
+        {phase===PH.ROLE_PICK&&(
+          <Card>
+            <div style={{textAlign:"center",paddingBottom:"0.5rem"}}>
+              <div style={{fontSize:"2rem",marginBottom:"0.75rem"}}>👋</div>
+              <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"1.2rem",color:T.charcoal,margin:"0 0 0.3rem"}}>
+                One last step
+              </h2>
+              <p style={{color:T.muted,fontSize:"0.83rem",margin:"0 0 1.5rem"}}>
+                Tell us how you'll use EasyJob so we can set up the right experience for you.
+              </p>
+              <p style={{color:T.text,fontSize:"0.82rem",fontWeight:600,margin:"0 0 0.75rem"}}>I am a...</p>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.75rem",marginBottom:"1.5rem"}}>
+                {[
+                  {id:"candidate",icon:"👤",label:"Candidate",desc:"Find jobs, get matched, build your career"},
+                  {id:"company",  icon:"🏢",label:"Company",  desc:"Post roles and hire pre-scored talent"},
+                ].map(({id,icon,label,desc})=>(
+                  <button key={id} onClick={()=>saveRoleAndContinue(id)}
+                    style={{border:`2px solid ${T.border}`,background:T.cardHi,borderRadius:12,padding:"1.25rem 0.75rem",cursor:"pointer",textAlign:"center",transition:"all 0.2s"}}
+                    onMouseEnter={e=>{e.currentTarget.style.borderColor=T.charcoal;e.currentTarget.style.background=T.card;e.currentTarget.style.transform="scale(1.02)";}}
+                    onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.background=T.cardHi;e.currentTarget.style.transform="scale(1)";}}>
+                    <div style={{fontSize:"1.75rem",marginBottom:8}}>{icon}</div>
+                    <p style={{fontSize:"0.9rem",fontWeight:600,color:T.text,margin:"0 0 4px"}}>{label}</p>
+                    <p style={{fontSize:"0.72rem",color:T.muted,margin:0,lineHeight:1.4}}>{desc}</p>
+                  </button>
+                ))}
               </div>
-            </Card>
-          )} 
+              {loading&&<Spinner/>}
+              <p style={{color:T.muted,fontSize:"0.72rem",marginTop:"0.75rem"}}>
+                Signed in as {user?.email}
+              </p>
+            </div>
+          </Card>
+        )}
+
         {/* ═══ CANDIDATE PROFILE ═══ */}
         {phase===PH.CAND_PROFILE&&(
           <Card>
@@ -936,6 +945,81 @@ export default function App() {
           </>
         )}
 
+        {/* ═══ JOB DETAIL ═══ */}
+        {phase===PH.JOB_DETAIL&&selJob&&(
+          <div style={{animation:"fadeUp 0.3s ease"}}>
+            <Card>
+              {/* header */}
+              <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:"1.25rem",gap:"1rem"}}>
+                <div style={{flex:1}}>
+                  <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"1.1rem",color:T.charcoal,margin:"0 0 4px"}}>{selJob.title}</h2>
+                  <p style={{color:T.muted,fontSize:"0.82rem",margin:"0 0 8px"}}>{selJob.company} · {selJob.location}</p>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                    <span style={{background:T.goldLt,color:T.goldDk,fontSize:"0.7rem",fontWeight:600,padding:"3px 10px",borderRadius:20,border:`1px solid ${T.gold}`}}>{selJob.bucketLabel}</span>
+                    {selJob.matchScore&&<span style={{background:T.card,color:T.charcoal,fontSize:"0.7rem",fontWeight:600,padding:"3px 10px",borderRadius:20,border:`1px solid ${T.border}`}}>Match: {selJob.matchScore}%</span>}
+                  </div>
+                </div>
+                <div style={{textAlign:"center",flexShrink:0}}>
+                  <div style={{width:56,height:56,borderRadius:"50%",border:`3px solid ${selJob.matchScore>=75?T.charcoal:selJob.matchScore>=55?T.gold:T.muted}`,display:"flex",alignItems:"center",justifyContent:"center",background:T.cardHi}}>
+                    <span style={{fontSize:"0.9rem",fontWeight:800,color:selJob.matchScore>=75?T.charcoal:selJob.matchScore>=55?T.gold:T.muted}}>{selJob.matchScore}%</span>
+                  </div>
+                  <p style={{fontSize:"0.6rem",color:T.muted,margin:"4px 0 0"}}>match</p>
+                </div>
+              </div>
+
+              {/* full JD */}
+              <div style={{marginBottom:"1.25rem"}}>
+                <p style={{color:T.muted,fontSize:"0.72rem",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"0.5rem"}}>Full Job Description</p>
+                <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:10,padding:"1rem",maxHeight:320,overflowY:"auto"}}>
+                  <p style={{fontSize:"0.84rem",color:T.text,lineHeight:1.75,margin:0,whiteSpace:"pre-wrap"}}>{selJob.description||"Full description not available for this listing."}</p>
+                </div>
+              </div>
+
+              {/* apply link */}
+              {selJob.url&&(
+                <div style={{marginBottom:"1.25rem",padding:"0.75rem 1rem",background:T.card,border:`1px solid ${T.border}`,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                  <div>
+                    <p style={{fontSize:"0.82rem",fontWeight:600,color:T.text,margin:"0 0 2px"}}>Apply on company site</p>
+                    <p style={{fontSize:"0.72rem",color:T.muted,margin:0}}>Opens in a new tab</p>
+                  </div>
+                  <a href={selJob.url} target="_blank" rel="noreferrer"
+                    style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:8,padding:"6px 14px",color:T.charcoal,fontSize:"0.78rem",fontWeight:600,textDecoration:"none",transition:"all 0.15s"}}
+                    onMouseEnter={e=>{e.currentTarget.style.background=T.charcoal;e.currentTarget.style.color="#fff";}}
+                    onMouseLeave={e=>{e.currentTarget.style.background=T.card;e.currentTarget.style.color=T.charcoal;}}>
+                    View listing ↗
+                  </a>
+                </div>
+              )}
+
+              {/* what happens next */}
+              <div style={{padding:"0.75rem 1rem",background:T.goldLt,border:`1px solid ${T.gold}`,borderRadius:10,marginBottom:"1.25rem"}}>
+                <p style={{fontSize:"0.78rem",fontWeight:600,color:T.goldDk,margin:"0 0 4px"}}>What happens when you click Analyse</p>
+                <p style={{fontSize:"0.75rem",color:T.goldDk,margin:0,lineHeight:1.6}}>
+                  1. AI extracts the key skills from this JD<br/>
+                  2. You rate your own proficiency on each skill<br/>
+                  3. You get a match score and personalised recommendation<br/>
+                  4. Your resume is tailored to this exact role
+                </p>
+              </div>
+
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <Btn variant="secondary" onClick={()=>setPhase(PH.HOME)}>← Back to Jobs</Btn>
+                <Btn variant="gold" onClick={async()=>{
+                  setLoad(true);
+                  try {
+                    const raw = await callClaude([{role:"user",content:P.jd(selJob.description||selJob.title).msg}],P.jd(selJob.description||selJob.title).sys);
+                    const parsed = JSON.parse(raw.replace(/```json|```/g,"").trim());
+                    setSkills(parsed.skills||[]);
+                    setMeta({jobTitle:parsed.jobTitle||selJob.title,company:parsed.company||selJob.company,seniority:parsed.seniorityLevel||"",roleType:parsed.roleType||"",topPriority:parsed.topPriority||""});
+                  } catch { setError("Paste the full JD manually for best results."); }
+                  setLoad(false);
+                  setPhase(PH.SKILLS);
+                }} disabled={loading}>{loading?"Extracting skills...":"Analyse This Role →"}</Btn>
+              </div>
+            </Card>
+          </div>
+        )}
+
         {/* JD */}
         {phase===PH.JD&&(
           <Card>
@@ -980,7 +1064,7 @@ export default function App() {
             {skills.map((s,i)=><SkillRow key={s} skill={s} rating={ratings[s]||0} onChange={v=>setRatings(r=>({...r,[s]:v}))} isTop={s===meta.topPriority}/>)}
             {skills.length>0&&(
               <div style={{display:"flex",justifyContent:"space-between",marginTop:"1rem"}}>
-                <Btn variant="secondary" onClick={()=>setPhase(PH.HOME)}>← Back</Btn>
+                <Btn variant="secondary" onClick={()=>setPhase(selJob?PH.JOB_DETAIL:PH.HOME)}>← Back</Btn>
                 <div style={{display:"flex",alignItems:"center",gap:"1rem"}}>
                   {loading&&<Spinner/>}
                   <Btn onClick={getRec} disabled={loading||skills.some(s=>!ratings[s])}>{loading?"Scoring...":"See My Match Score →"}</Btn>
