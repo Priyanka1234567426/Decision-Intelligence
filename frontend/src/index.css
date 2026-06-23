@@ -9,50 +9,57 @@ html {
   scroll-behavior: smooth;
 }
 
+:root {
+  --bg:       #FAF7F2;
+  --card:     #FFFFFF;
+  --teal:     #2C4A3E;
+  --teal-mid: #3D6B5A;
+  --teal-lt:  #E6F0EC;
+  --terra:    #C5603A;
+  --terra-dk: #A0391A;
+  --terra-lt: #FDF0EA;
+  --border:   #E8E0D5;
+  --text:     #1A1A1A;
+  --muted:    #8B7E75;
+  --font:     'DM Sans', system-ui, sans-serif;
+  --font-hd:  'Syne', sans-serif;
+  --r-sm:     8px;
+  --r-md:     12px;
+  --r-lg:     16px;
+}
+
 body {
-  background-color: #0b1120;
-  color: #ffffff;
-  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
-  line-height: 1.5;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  line-height: 1.6;
   min-height: 100vh;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-img, svg {
-  max-width: 100%;
-  display: block;
+img, svg { max-width: 100%; display: block; }
+button { cursor: pointer; font-family: inherit; }
+input, textarea, select { font-family: inherit; font-size: inherit; }
+ul, ol { list-style: none; }
+
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+#root { min-height: 100vh; }
+
+input::placeholder,
+textarea::placeholder { color: var(--muted); opacity: 0.7; }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-button {
-  cursor: pointer;
-  font-family: inherit;
-}
-
-input, textarea, select {
-  font-family: inherit;
-  font-size: inherit;
-}
-
-ul, ol {
-  list-style: none;
-}
-
-::-webkit-scrollbar {
-  width: 5px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
-}
-
-#root {
-  min-height: 100vh;
+@keyframes pulse {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.5; }
+  40%            { transform: translateY(-6px); opacity: 1; }
 }
