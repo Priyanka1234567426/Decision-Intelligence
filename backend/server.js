@@ -369,7 +369,15 @@ app.post("/api/match", aiLimiter, async (req, res) => {
 app.use((req, res) => {
   res.status(404).json({ error: `Route ${req.method} ${req.url} not found` });
 });
-
+// Keep server alive — self-ping every 14 minutes
+setInterval(async () => {
+  try {
+    await fetch(`https://decision-intelligence-el9w.onrender.com/health`);
+    console.log("Self-ping: server kept alive");
+  } catch(e) {
+    console.log("Self-ping failed:", e.message);
+  }
+}, 14 * 60 * 1000);
 /*
 --------------------------------
 START SERVER
