@@ -1290,7 +1290,7 @@ Return ONLY valid JSON: {"jobTitle":"","company":"","seniorityLevel":"Mid","skil
             {/* stats */}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0.75rem",marginBottom:"1.25rem"}}>
               {[
-                {label:"Jobs matched",value:jobs.length||"—",color:T.charcoal},
+                {label:"Jobs matched",value:jobsLoading?"...":jobs.length||"0",color:T.charcoal},
                 {label:"Buckets active",value:candProfile?.buckets?.length||0,color:T.gold},
                 {label:"Profile score",value:"100%",color:T.charcoal},
               ].map(({label,value,color},i)=>(
@@ -1310,7 +1310,11 @@ Return ONLY valid JSON: {"jobTitle":"","company":"","seniorityLevel":"Mid","skil
               </div>
               {!jobsLoading&&jobs.length===0&&(
                 <SurfaceCard style={{textAlign:"center",padding:"1.5rem"}}>
-                  <p style={{color:T.muted,fontSize:"0.84rem",margin:0}}>Your matched jobs will appear here once your profile is complete.</p>
+                  <p style={{color:T.text,fontSize:"0.84rem",fontWeight:600,margin:"0 0 0.35rem"}}>No jobs loaded yet</p>
+                  <p style={{color:T.muted,fontSize:"0.78rem",margin:"0 0 1rem",lineHeight:1.6}}>
+                    The jobs feed may be warming up. Click refresh to try again.
+                  </p>
+                  <Btn small onClick={()=>loadJobs(candProfile)}>↻ Refresh Jobs</Btn>
                 </SurfaceCard>
               )}
               {jobs.slice(0,10).map((job,i)=>(
