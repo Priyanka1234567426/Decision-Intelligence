@@ -402,6 +402,7 @@ export default function App() {
   const [jobs,setJobs]     = useState([]);
   const [jobsLoading,setJobsLoading] = useState(false);
   const [selJob,setSelJob] = useState(null);
+  const [skillsCache,setSkillsCache] = useState({});
   const [jd,setJd]         = useState("");
   const [meta,setMeta]     = useState({jobTitle:"",company:"",seniority:"",roleType:"",topPriority:""});
   const [skills,setSkills] = useState([]);
@@ -474,7 +475,16 @@ export default function App() {
         setCoProfile(data); loadCoJobs(data.id); loadCandidates(); setPhase(PH.CO_HOME);
       } else {
         setCandProfile(data);
-        setPhase(data.background ? PH.HOME : PH.CAND_PROFILE);
+        const savedJob = sessionStorage.getItem("ej_selJob");
+        const savedPhase = sessionStorage.getItem("ej_phase");
+        if (savedJob && savedPhase && data.background) {
+          const job = JSON.parse(savedJob);
+          setSelJob(job); setJd(job.description);
+          setMeta({jobTitle:job.title,company:job.company,seniority:"",roleType:"",topPriority:""});
+          setPhase(savedPhase);
+        } else {
+          setPhase(data.background ? PH.HOME : PH.CAND_PROFILE);
+        }
       }
     } catch { setPhase(PH.AUTH); }
   }
@@ -632,13 +642,18 @@ export default function App() {
   function startManualJD() {
     setJd(""); setMeta({jobTitle:"",company:"",seniority:"",roleType:"",topPriority:""});
     setSkills([]); setRatings({}); setRec(""); setResume(""); setAtsReview(""); setAtsScore(null); setCl(""); setError("");
-    setSelJob(null); setPhase(PH.JD);
+    setSelJob(null);
+    sessionStorage.removeItem("ej_selJob");
+    sessionStorage.removeItem("ej_phase");
+    setPhase(PH.JD);
   }
 
   function selectJob(job) {
     setSelJob(job); setJd(job.description);
     setMeta({jobTitle:job.title,company:job.company,seniority:"",roleType:"",topPriority:""});
     setSkills([]); setRatings({}); setError("");
+    sessionStorage.setItem("ej_selJob", JSON.stringify(job));
+    sessionStorage.setItem("ej_phase", PH.JOB_DETAIL);
     setPhase(PH.JOB_DETAIL);
   }
 
@@ -700,7 +715,7 @@ export default function App() {
      RENDER
   ══════════════════════════ */
   return (
-    <div style={{background:T.bg,minHeight:"100vh",fontFamily:"'Inter',sans-serif",padding:"1.5rem 1rem"}}>
+    <div style={{background:phase===PH.LANDING?"#fff":T.bg,minHeight:"100vh",fontFamily:"'Inter',sans-serif",padding:phase===PH.LANDING?"0":"1.5rem 1rem"}}>
       <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet"/>
       <style>{`
         @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
@@ -713,10 +728,10 @@ export default function App() {
         select option{color:${T.text};background:#fff}
       `}</style>
 
-      <div style={{maxWidth:720,margin:"0 auto"}}>
+      <div style={{maxWidth:phase===PH.LANDING?"100%":860,margin:"0 auto"}}>
 
         {/* HEADER */}
-         {phase!==PH.LANDING&&<header style={{marginBottom:"1.5rem",animation:"fadeUp 0.3s ease"}}>
+        {phase!==PH.LANDING&&<header style={{marginBottom:"1.5rem",animation:"fadeUp 0.3s ease"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0.75rem 1rem",background:T.cardHi,border:`1px solid ${T.border}`,borderRadius:14}}>
             {/* logo */}
             <h1 style={{fontFamily:"'Syne',sans-serif",fontSize:"1.5rem",fontWeight:800,color:T.charcoal,margin:0}}>
@@ -1352,6 +1367,15 @@ export default function App() {
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <Btn variant="secondary" onClick={()=>setPhase(PH.HOME)}>← Back to Jobs</Btn>
                 <Btn variant="gold" onClick={async()=>{
+                  // Check cache first
+                  const cacheKey = selJob.id||selJob.title;
+                  if (skillsCache[cacheKey]) {
+                    setSkills(skillsCache[cacheKey].skills);
+                    setMeta(skillsCache[cacheKey].meta);
+                    setJd(skillsCache[cacheKey].jd||selJob.description||"");
+                    setPhase(PH.SKILLS);
+                    return;
+                  }
                   setLoad(true); setError("");
                   try {
                     const jdText = (selJob.description||"").trim();
@@ -1374,9 +1398,11 @@ Rules:
                     const parsed = JSON.parse(jsonStr);
                     const extractedSkills = parsed.skills||[];
                     if (extractedSkills.length>0) {
+                      const newMeta = {jobTitle:parsed.jobTitle||selJob.title,company:parsed.company||selJob.company||"",seniority:parsed.seniorityLevel||"",roleType:parsed.roleType||"",topPriority:parsed.topPriority||""};
                       setSkills(extractedSkills);
-                      setMeta({jobTitle:parsed.jobTitle||selJob.title,company:parsed.company||selJob.company||"",seniority:parsed.seniorityLevel||"",roleType:parsed.roleType||"",topPriority:parsed.topPriority||""});
+                      setMeta(newMeta);
                       setJd(jdText||selJob.title);
+                      setSkillsCache(prev=>({...prev,[cacheKey]:{skills:extractedSkills,meta:newMeta,jd:jdText}}));
                     } else {
                       // Fallback — generate generic skills from title words
                       setSkills(["Communication","Problem Solving","Data Analysis","Stakeholder Management","Project Management","Strategic Thinking","Domain Knowledge"]);
