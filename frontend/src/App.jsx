@@ -79,7 +79,7 @@ const JOB_TYPES = ["Full-time","Part-time","Contract","Freelance","Internship"];
 
 /* ── phases ── */
 const PH = {
-  LOADING:"loading", AUTH:"auth", ROLE_PICK:"role_pick", JOB_DETAIL:"job_detail",
+  LOADING:"loading", LANDING:"landing", AUTH:"auth", ROLE_PICK:"role_pick", JOB_DETAIL:"job_detail",
   CAND_PROFILE:"cand_profile", CAND_BUCKETS:"cand_buckets", HOME:"home",
   JD:"jd", SKILLS:"skills", REC:"rec", RESUME:"resume", ATS:"ats", CL:"cl",
   CO_PROFILE:"co_profile", CO_HOME:"co_home", CO_POST:"co_post",
@@ -453,7 +453,7 @@ export default function App() {
     });
     const {data:{subscription}} = supabase.auth.onAuthStateChange((_e,session)=>{
       if (session?.user) { setUser(session.user); loadProfile(session.user); }
-      else { setUser(null); setPhase(PH.AUTH); }
+      else { setUser(null); setPhase(PH.LANDING); }
     });
     return ()=>subscription.unsubscribe();
   },[]);
@@ -509,7 +509,7 @@ export default function App() {
   async function googleAuth() {
     setLoad(true);
     window.history.replaceState(null,"",window.location.pathname);
-    const {error} = await supabase.auth.signInWithOAuth({provider:"google",options:{redirectTo:window.location.origin+"/app"}});
+    const {error} = await supabase.auth.signInWithOAuth({provider:"google",options:{redirectTo:window.location.origin}});
     if (error) { setError(error.message); setLoad(false); }
   }
 
@@ -788,6 +788,246 @@ export default function App() {
           <div style={{background:T.goldLt,border:`1px solid ${T.gold}`,borderRadius:10,padding:"0.75rem 1rem",marginBottom:"1rem",display:"flex",justifyContent:"space-between",alignItems:"center",animation:"scaleIn 0.2s ease"}}>
             <span style={{color:T.goldDk,fontSize:"0.82rem"}}>{error}</span>
             <button onClick={()=>setError("")} style={{background:"none",border:"none",color:T.goldDk,cursor:"pointer",fontSize:"1rem"}}>×</button>
+          </div>
+        )}
+
+        {/* ═══ LANDING ═══ */}
+        {phase===PH.LANDING&&(
+          <div style={{animation:"fadeIn 0.4s ease",margin:"-1.5rem -1rem",fontFamily:"'Inter',sans-serif"}}>
+            <style>{`
+              .ej-nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,0.96);backdrop-filter:blur(8px);border-bottom:0.5px solid #D4D4D4;padding:0 2rem;height:60px;display:flex;align-items:center;justify-content:space-between}
+              .ej-hero{background:#fff;padding:5rem 2rem 4rem;text-align:center;position:relative;overflow:hidden;border-bottom:0.5px solid #D4D4D4}
+              .ej-hero h1{font-family:'Syne',sans-serif;font-size:clamp(2rem,5vw,3.2rem);font-weight:800;color:#2C2C2E;line-height:1.15;margin-bottom:1rem}
+              .ej-hero h1 em{color:#C9962A;font-style:normal}
+              .ej-stats{background:#2C2C2E;padding:2rem;display:flex;justify-content:center;gap:4rem;flex-wrap:wrap}
+              .ej-split{display:grid;grid-template-columns:1fr 1fr;gap:3rem;align-items:center;max-width:1000px;margin:0 auto}
+              .ej-step{background:#fff;border:0.5px solid #D4D4D4;border-radius:14px;padding:1.25rem;transition:all 0.2s}
+              .ej-step:hover{border-color:#2C2C2E;transform:translateY(-3px);box-shadow:0 8px 20px rgba(0,0,0,0.08)}
+              .ej-btn{display:inline-flex;align-items:center;gap:6px;border:none;border-radius:10px;padding:11px 24px;font-size:0.88rem;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;transition:all 0.18s}
+              .ej-btn:hover{transform:translateY(-2px)}
+              .ej-btn-dark{background:#2C2C2E;color:#fff}
+              .ej-btn-gold{background:#C9962A;color:#fff}
+              .ej-btn-outline{background:transparent;color:#2C2C2E;border:1.5px solid #D4D4D4}
+              .ej-btn-outline:hover{border-color:#2C2C2E}
+              .ej-pill{font-size:0.72rem;font-weight:600;padding:4px 12px;border-radius:20px}
+              .ej-section{padding:4rem 2rem}
+              .ej-tcard{background:rgba(255,255,255,0.06);border:0.5px solid rgba(255,255,255,0.1);border-radius:14px;padding:1.25rem}
+              @media(max-width:680px){.ej-split{grid-template-columns:1fr}.ej-stats{gap:2rem}}
+            `}</style>
+
+            {/* NAV */}
+            <nav className="ej-nav">
+              <span style={{fontFamily:"'Syne',sans-serif",fontSize:"1.3rem",fontWeight:800,color:"#2C2C2E"}}>
+                Easy<span style={{color:"#C9962A"}}>Job</span>
+              </span>
+              <div style={{display:"flex",gap:"0.5rem"}}>
+                <button className="ej-btn ej-btn-outline" style={{padding:"7px 16px",fontSize:"0.82rem"}}
+                  onClick={()=>{ setAuthMode("signin"); setAuthPersona("candidate"); setPhase(PH.AUTH); }}>
+                  Sign in
+                </button>
+                <button className="ej-btn ej-btn-gold" style={{padding:"7px 16px",fontSize:"0.82rem"}}
+                  onClick={()=>{ setAuthMode("signup"); setAuthPersona("candidate"); setPhase(PH.AUTH); }}>
+                  Get started free
+                </button>
+              </div>
+            </nav>
+
+            {/* HERO */}
+            <section className="ej-hero">
+              <div style={{display:"inline-flex",alignItems:"center",gap:6,background:"#F5E6C8",color:"#9A6F1A",fontSize:"0.72rem",fontWeight:700,padding:"5px 14px",borderRadius:20,border:"1px solid #C9962A",marginBottom:"1.25rem",letterSpacing:"0.05em"}}>
+                <span style={{width:6,height:6,borderRadius:"50%",background:"#C9962A",display:"inline-block"}}></span>
+                Now in beta · Global launch
+              </div>
+              <h1 className="ej-hero h1" style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(2rem,5vw,3.2rem)",fontWeight:800,color:"#2C2C2E",lineHeight:1.15,marginBottom:"1rem"}}>
+                The smartest way<br/><em style={{color:"#C9962A",fontStyle:"normal"}}>to grow your career</em>
+              </h1>
+              <p style={{fontSize:"1rem",color:"#777",maxWidth:560,margin:"0 auto 2rem",lineHeight:1.75}}>
+                EasyJob gives every candidate and every company a clear, honest picture — matched skills, real scores, and AI that works for both sides of the table.
+              </p>
+              <div style={{display:"flex",gap:"1rem",justifyContent:"center",flexWrap:"wrap",marginBottom:"2rem"}}>
+                <button className="ej-btn ej-btn-dark" style={{fontSize:"0.92rem",padding:"13px 28px",borderRadius:12}}
+                  onClick={()=>{ setAuthMode("signup"); setAuthPersona("candidate"); setPhase(PH.AUTH); }}>
+                  Find my next role →
+                </button>
+                <button className="ej-btn ej-btn-gold" style={{fontSize:"0.92rem",padding:"13px 28px",borderRadius:12}}
+                  onClick={()=>{ setAuthMode("signup"); setAuthPersona("company"); setPhase(PH.AUTH); }}>
+                  Start hiring smarter →
+                </button>
+              </div>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:"1.5rem",flexWrap:"wrap"}}>
+                {["Free for candidates","No resume guesswork","Real skill tests","AI-powered · Global"].map(t=>(
+                  <div key={t} style={{display:"flex",alignItems:"center",gap:6,fontSize:"0.78rem",color:"#777"}}>
+                    <span style={{width:5,height:5,borderRadius:"50%",background:"#C9962A",display:"inline-block"}}></span>{t}
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* STATS */}
+            <div className="ej-stats">
+              {[["5×","Faster shortlisting"],["100%","Honest match score"],["AI","Skill extraction"],["Global","From day one"]].map(([n,l])=>(
+                <div key={l} style={{textAlign:"center"}}>
+                  <div style={{fontFamily:"'Syne',sans-serif",fontSize:"1.8rem",fontWeight:800,color:"#C9962A"}}>{n}</div>
+                  <div style={{fontSize:"0.78rem",color:"rgba(255,255,255,0.5)",marginTop:4}}>{l}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* CANDIDATE SECTION */}
+            <section className="ej-section" style={{background:"#F0F0F0"}}>
+              <div className="ej-split">
+                <div>
+                  <div style={{fontSize:"0.72rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",color:"#C9962A",marginBottom:"0.5rem"}}>For candidates</div>
+                  <div style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(1.5rem,3vw,2rem)",fontWeight:800,color:"#2C2C2E",marginBottom:"0.85rem",lineHeight:1.2}}>Your career intelligence,<br/>all in one place</div>
+                  <p style={{fontSize:"0.92rem",color:"#777",lineHeight:1.75,marginBottom:"1.25rem"}}>See exactly how well you match any role, get a resume tailored to that specific company, and understand where you stand in the market — before you hit apply.</p>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:"1.5rem"}}>
+                    {["AI skill matching","Tailored resume","ATS review","Cover letter","Market score"].map(p=>(
+                      <span key={p} className="ej-pill" style={{background:"#F5E6C8",color:"#9A6F1A",border:"1px solid #C9962A"}}>{p}</span>
+                    ))}
+                  </div>
+                  <button className="ej-btn ej-btn-dark"
+                    onClick={()=>{ setAuthMode("signup"); setAuthPersona("candidate"); setPhase(PH.AUTH); }}>
+                    Start for free →
+                  </button>
+                </div>
+                <div>
+                  <div style={{background:"#2C2C2E",borderRadius:16,padding:"1.5rem",transform:"rotate(4deg)",marginBottom:"1rem"}}>
+                    <div style={{transform:"rotate(-4deg)"}}>
+                      <div style={{fontSize:"0.7rem",color:"rgba(255,255,255,0.5)",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.06em"}}>Job description</div>
+                      <div style={{fontSize:"0.9rem",fontWeight:600,color:"#fff",marginBottom:2}}>Senior Data Analyst · Zepto</div>
+                      <div style={{fontSize:"0.75rem",color:"rgba(255,255,255,0.55)",marginBottom:"0.75rem"}}>Hyderabad · Full-time</div>
+                      {[100,88,94,72,85].map((w,i)=>(
+                        <div key={i} style={{height:8,borderRadius:4,background:"rgba(255,255,255,0.12)",width:`${w}%`,marginBottom:6}}/>
+                      ))}
+                      <div style={{marginTop:"0.75rem",display:"inline-flex",alignItems:"center",gap:4,background:"rgba(201,150,42,0.2)",color:"#C9962A",fontSize:"0.68rem",fontWeight:600,padding:"3px 10px",borderRadius:20}}>Match score: 84% ✓</div>
+                    </div>
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.75rem"}}>
+                    <div style={{background:"#fff",border:"0.5px solid #D4D4D4",borderRadius:12,padding:"1rem"}}>
+                      <div style={{fontSize:"0.68rem",color:"#777",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>Market score</div>
+                      <div style={{fontFamily:"'Syne',sans-serif",fontSize:"1.8rem",fontWeight:800,color:"#2C2C2E"}}>71<span style={{fontSize:"1rem",color:"#777"}}>%</span></div>
+                      <div style={{fontSize:"0.72rem",color:"#C9962A",fontWeight:600}}>↑ Improving</div>
+                    </div>
+                    <div style={{background:"#2C2C2E",borderRadius:12,padding:"1rem"}}>
+                      <div style={{fontSize:"0.68rem",color:"rgba(255,255,255,0.45)",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>Shortlisted</div>
+                      <div style={{fontFamily:"'Syne',sans-serif",fontSize:"1.8rem",fontWeight:800,color:"#C9962A"}}>3</div>
+                      <div style={{fontSize:"0.72rem",color:"rgba(255,255,255,0.45)"}}>of 12 applied</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* HOW IT WORKS */}
+              <div style={{maxWidth:1000,margin:"3rem auto 0",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:"1rem"}}>
+                {[
+                  {n:"01",icon:"📋",title:"Find your match",body:"Browse real jobs matched to your profile, or paste any JD from LinkedIn or Naukri."},
+                  {n:"02",icon:"⚡",title:"AI reads the role",body:"7–9 critical skills extracted from the JD in seconds. No manual tagging."},
+                  {n:"03",icon:"🎯",title:"See your real score",body:"Rate your skills honestly. Get a match score and a clear recommendation."},
+                  {n:"04",icon:"📄",title:"Resume tailored",body:"Your resume rewritten for this exact role, this exact company."},
+                  {n:"05",icon:"✉️",title:"Cover letter ready",body:"Specific, confident, and unique to this application. Ready in seconds."},
+                ].map(s=>(
+                  <div key={s.n} className="ej-step">
+                    <div style={{fontSize:"0.6rem",fontWeight:800,color:"#D4D4D4",marginBottom:"0.75rem",letterSpacing:"0.08em"}}>STEP {s.n}</div>
+                    <div style={{width:44,height:44,borderRadius:12,background:"#F5E6C8",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.2rem",marginBottom:"0.75rem"}}>{s.icon}</div>
+                    <h3 style={{fontSize:"0.88rem",fontWeight:600,color:"#2C2C2E",marginBottom:"0.35rem",fontFamily:"'Inter',sans-serif"}}>{s.title}</h3>
+                    <p style={{fontSize:"0.75rem",color:"#777",lineHeight:1.55}}>{s.body}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* COMPANY SECTION */}
+            <section className="ej-section" style={{background:"#fff",borderTop:"0.5px solid #D4D4D4"}}>
+              <div className="ej-split" style={{direction:"rtl"}}>
+                <div style={{direction:"ltr"}}>
+                  <div style={{fontSize:"0.72rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",color:"#C9962A",marginBottom:"0.5rem"}}>For companies</div>
+                  <div style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(1.5rem,3vw,2rem)",fontWeight:800,color:"#2C2C2E",marginBottom:"0.85rem",lineHeight:1.2}}>Build a pipeline of<br/>candidates who can<br/>actually do the job</div>
+                  <p style={{fontSize:"0.92rem",color:"#777",lineHeight:1.75,marginBottom:"1.25rem"}}>Post a role, attach a skill test designed by your team or generated by AI from the JD, and receive a ranked pipeline sorted by real skill scores.</p>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:"1.5rem"}}>
+                    {["Post roles","AI skill tests","Ranked pipeline","AI hiring insights"].map(p=>(
+                      <span key={p} className="ej-pill" style={{background:"#2C2C2E",color:"#fff",border:"1px solid #2C2C2E"}}>{p}</span>
+                    ))}
+                  </div>
+                  <button className="ej-btn ej-btn-gold"
+                    onClick={()=>{ setAuthMode("signup"); setAuthPersona("company"); setPhase(PH.AUTH); }}>
+                    Start hiring smarter →
+                  </button>
+                </div>
+                <div style={{direction:"ltr"}}>
+                  <div style={{position:"relative",height:240,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                    {[220,180].map(s=><div key={s} style={{position:"absolute",width:s,height:s,borderRadius:"50%",border:"1.5px solid rgba(44,44,46,0.1)"}}/>)}
+                    <div style={{width:160,height:160,borderRadius:"50%",background:"#C9962A",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",position:"relative",zIndex:2}}>
+                      <div style={{fontFamily:"'Syne',sans-serif",fontSize:"2.2rem",fontWeight:800,color:"#fff"}}>84%</div>
+                      <div style={{fontSize:"0.68rem",color:"rgba(255,255,255,0.8)",textAlign:"center",padding:"0 1rem",lineHeight:1.4}}>top candidate<br/>skill score</div>
+                    </div>
+                    <div style={{position:"absolute",top:10,right:20,background:"#fff",border:"0.5px solid #D4D4D4",borderRadius:10,padding:"6px 12px",boxShadow:"0 4px 12px rgba(0,0,0,0.08)"}}>
+                      <div style={{fontSize:"0.65rem",color:"#777"}}>Ranked #1</div>
+                      <div style={{fontSize:"0.82rem",fontWeight:600,color:"#2C2C2E"}}>Priya S.</div>
+                    </div>
+                    <div style={{position:"absolute",bottom:20,left:10,background:"#F5E6C8",border:"1px solid #C9962A",borderRadius:10,padding:"6px 12px"}}>
+                      <div style={{fontSize:"0.65rem",color:"#9A6F1A"}}>38 applied</div>
+                      <div style={{fontSize:"0.82rem",fontWeight:600,color:"#9A6F1A"}}>3 shortlisted</div>
+                    </div>
+                  </div>
+                  <div style={{background:"#F0F0F0",borderRadius:12,padding:"1rem",borderLeft:"3px solid #C9962A",marginTop:"0.75rem"}}>
+                    <div style={{fontSize:"0.68rem",color:"#C9962A",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:3}}>AI insight</div>
+                    <div style={{fontSize:"0.8rem",color:"#1C1C1E",lineHeight:1.6}}>Top 2 candidates score above 80% on SQL. Consider adding a case study to differentiate the final shortlist.</div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* TESTIMONIALS */}
+            <section style={{background:"#2C2C2E",padding:"4rem 2rem"}}>
+              <div style={{textAlign:"center",marginBottom:"2rem"}}>
+                <div style={{fontSize:"0.72rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",color:"#C9962A",marginBottom:"0.5rem"}}>Early users</div>
+                <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"1.6rem",fontWeight:800,color:"#fff"}}>What beta users are saying</h2>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:"1rem",maxWidth:900,margin:"0 auto"}}>
+                {[
+                  {q:"Finally a platform that tells me honestly if I should apply. Saved me from wasting time on the wrong roles.",name:"Aisha R.",role:"Senior Analyst, Hyderabad"},
+                  {q:"The skill test feature changed how we hire. We now spend interview time on people who can actually do the work.",name:"Rahul M.",role:"Head of Talent, Zepto"},
+                  {q:"Three interviews in two weeks. The tailored resume made my applications actually land.",name:"Priya K.",role:"Product Manager, Bangalore"},
+                ].map(t=>(
+                  <div key={t.name} className="ej-tcard">
+                    <div style={{color:"#C9962A",fontSize:"0.75rem",marginBottom:"0.75rem",letterSpacing:2}}>★★★★★</div>
+                    <p style={{fontSize:"0.84rem",color:"rgba(255,255,255,0.75)",lineHeight:1.7,marginBottom:"1.25rem"}}>"{t.q}"</p>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <div style={{width:34,height:34,borderRadius:"50%",background:"#C9962A",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"0.78rem",fontWeight:700,color:"#fff",flexShrink:0}}>{t.name[0]}</div>
+                      <div>
+                        <div style={{fontSize:"0.82rem",fontWeight:600,color:"#fff"}}>{t.name}</div>
+                        <div style={{fontSize:"0.7rem",color:"rgba(255,255,255,0.4)"}}>{t.role}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* CTA */}
+            <section style={{background:"#fff",padding:"5rem 2rem",textAlign:"center",borderTop:"0.5px solid #D4D4D4"}}>
+              <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(1.5rem,3vw,2rem)",fontWeight:800,color:"#2C2C2E",marginBottom:"0.85rem"}}>Ready to find where you stand?</h2>
+              <p style={{fontSize:"0.95rem",color:"#777",maxWidth:480,margin:"0 auto 2.5rem",lineHeight:1.75}}>Join the beta today. Free for candidates, built for the global job market, powered by Claude AI.</p>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1rem",maxWidth:560,margin:"0 auto"}}>
+                {[
+                  {icon:"👤",title:"I am a candidate",desc:"Match to real jobs, get your resume tailored, and grow your market score.",persona:"candidate"},
+                  {icon:"🏢",title:"I am hiring",desc:"Post roles, build skill tests, and receive a ranked pipeline that saves your team hours.",persona:"company"},
+                ].map(c=>(
+                  <button key={c.persona} onClick={()=>{ setAuthMode("signup"); setAuthPersona(c.persona); setPhase(PH.AUTH); }}
+                    style={{border:"1.5px solid #D4D4D4",borderRadius:16,padding:"1.75rem 1.25rem",textAlign:"center",cursor:"pointer",background:"#fff",transition:"all 0.2s",fontFamily:"'Inter',sans-serif"}}
+                    onMouseEnter={e=>{e.currentTarget.style.borderColor="#2C2C2E";e.currentTarget.style.transform="translateY(-3px)";e.currentTarget.style.boxShadow="0 8px 20px rgba(0,0,0,0.08)";}}
+                    onMouseLeave={e=>{e.currentTarget.style.borderColor="#D4D4D4";e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="none";}}>
+                    <div style={{fontSize:"2rem",marginBottom:"0.75rem"}}>{c.icon}</div>
+                    <h3 style={{fontSize:"0.95rem",fontWeight:700,color:"#2C2C2E",marginBottom:"0.35rem"}}>{c.title}</h3>
+                    <p style={{fontSize:"0.78rem",color:"#777",lineHeight:1.5}}>{c.desc}</p>
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <footer style={{background:"#2C2C2E",padding:"1.5rem",textAlign:"center"}}>
+              <p style={{fontSize:"0.75rem",color:"rgba(255,255,255,0.3)"}}>EasyJob · Beta · Powered by Claude AI · Built for the global job market</p>
+            </footer>
           </div>
         )}
 
