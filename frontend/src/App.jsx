@@ -846,7 +846,7 @@ Return ONLY valid JSON: {"jobTitle":"","company":"","seniorityLevel":"Mid","skil
             </div>
           </div>
           <p style={{textAlign:"center",color:T.muted,fontSize:"0.72rem",margin:"0.4rem 0 0"}}>AI-Powered Career Intelligence · Global</p>
-        </header>
+        </header>}
 
         {/* ERROR */}
         {error&&(
