@@ -403,6 +403,8 @@ export default function App() {
   const [jobsLoading,setJobsLoading] = useState(false);
   const [selJob,setSelJob] = useState(null);
   const [skillsCache,setSkillsCache] = useState({});
+  const [extracting,setExtracting] = useState(false);
+  const [extractStatus,setExtractStatus] = useState("");
   const [jd,setJd]         = useState("");
   const [meta,setMeta]     = useState({jobTitle:"",company:"",seniority:"",roleType:"",topPriority:""});
   const [skills,setSkills] = useState([]);
@@ -462,6 +464,48 @@ export default function App() {
   useEffect(()=>{
     if (phase===PH.HOME && candProfile?.buckets?.length>0) loadJobs(candProfile);
   },[phase,candProfile]);
+
+  // Auto-extract skills when job detail opens
+  useEffect(()=>{
+    if (phase!==PH.JOB_DETAIL||!selJob||extracting) return;
+    const cacheKey = selJob.id||selJob.title;
+    if (skillsCache[cacheKey]) return; // already cached
+    autoExtractSkills();
+  },[phase,selJob]);
+
+  async function autoExtractSkills() {
+    if (!selJob||extracting) return;
+    const cacheKey = selJob.id||selJob.title;
+    if (skillsCache[cacheKey]) return;
+    setExtracting(true);
+    setExtractStatus("Reading job description...");
+    try {
+      const jdText = (selJob.description||"").trim();
+      setExtractStatus("Extracting key skills...");
+      const prompt = `You are a senior recruiter. List exactly 7 skills for this role.
+Job Title: ${selJob.title}
+Company: ${selJob.company||""}
+Description: ${jdText.length>50?jdText:"No description — infer from title."}
+Return ONLY valid JSON: {"jobTitle":"","company":"","seniorityLevel":"Mid","skills":["s1","s2","s3","s4","s5","s6","s7"],"roleType":"business","topPriority":"s1"}`;
+      const raw = await callClaude([{role:"user",content:prompt}],"Return valid JSON only. No markdown.");
+      const cleaned = raw.replace(/```json|```/g,"").trim();
+      const parsed = JSON.parse(cleaned.slice(cleaned.indexOf("{"),cleaned.lastIndexOf("}")+1));
+      const extractedSkills = parsed.skills?.length>0 ? parsed.skills :
+        ["Communication","Problem Solving","Data Analysis","Stakeholder Management","Project Management","Strategic Thinking","Domain Knowledge"];
+      const newMeta = {
+        jobTitle:parsed.jobTitle||selJob.title,
+        company:parsed.company||selJob.company||"",
+        seniority:parsed.seniorityLevel||"",
+        roleType:parsed.roleType||"",
+        topPriority:parsed.topPriority||""
+      };
+      setSkillsCache(prev=>({...prev,[cacheKey]:{skills:extractedSkills,meta:newMeta,jd:jdText}}));
+      setExtractStatus("Skills ready!");
+    } catch(e) {
+      setExtractStatus("Ready to extract");
+    }
+    setExtracting(false);
+  }
 
   async function loadProfile(u) {
     try {
@@ -613,6 +657,7 @@ export default function App() {
   async function getRec() {
     if (skills.some(s=>!ratings[s])) { setError("Rate all skills to see your match score."); return; }
     setLoad(true); setError("");
+    setExtractStatus("Calculating your match score...");
     const res = await callClaude([{role:"user",content:P.rec(jd,meta,skillSummary).msg}],P.rec(jd,meta,skillSummary).sys);
     const m = res.match(/(\d+)\/100/);
     if (m) await saveAssessment(parseInt(m[1]));
@@ -646,6 +691,11 @@ export default function App() {
     sessionStorage.removeItem("ej_selJob");
     sessionStorage.removeItem("ej_phase");
     setPhase(PH.JD);
+  }
+
+  function goToPhase(ph) {
+    sessionStorage.setItem("ej_phase", ph);
+    setPhase(ph);
   }
 
   function selectJob(job) {
@@ -796,7 +846,7 @@ export default function App() {
             </div>
           </div>
           <p style={{textAlign:"center",color:T.muted,fontSize:"0.72rem",margin:"0.4rem 0 0"}}>AI-Powered Career Intelligence · Global</p>
-        </header>}
+        </header>
 
         {/* ERROR */}
         {error&&(
@@ -1364,16 +1414,31 @@ export default function App() {
                 </p>
               </div>
 
+              {/* extraction status bar */}
+              {(extracting||extractStatus)&&(
+                <div style={{padding:"0.6rem 1rem",background:T.goldLt,border:`1px solid ${T.gold}`,borderRadius:8,marginBottom:"0.75rem",display:"flex",alignItems:"center",gap:8,fontSize:"0.78rem",color:T.goldDk}}>
+                  {extracting&&<div style={{width:12,height:12,borderRadius:"50%",border:`2px solid ${T.gold}`,borderTopColor:"transparent",animation:"spin 0.8s linear infinite",flexShrink:0}}/>}
+                  <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+                  {extracting?"AI is reading this role in the background...":extractStatus==="Skills ready!"?"✓ Skills extracted — click Analyse to continue":extractStatus}
+                </div>
+              )}
+
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <Btn variant="secondary" onClick={()=>setPhase(PH.HOME)}>← Back to Jobs</Btn>
                 <Btn variant="gold" onClick={async()=>{
-                  // Check cache first
+                  // Use cache if available
                   const cacheKey = selJob.id||selJob.title;
                   if (skillsCache[cacheKey]) {
                     setSkills(skillsCache[cacheKey].skills);
                     setMeta(skillsCache[cacheKey].meta);
                     setJd(skillsCache[cacheKey].jd||selJob.description||"");
+                    sessionStorage.setItem("ej_phase", PH.SKILLS);
                     setPhase(PH.SKILLS);
+                    return;
+                  }
+                  // If still extracting in background, wait
+                  if (extracting) {
+                    setError("Skills are being extracted — please wait a moment and try again.");
                     return;
                   }
                   setLoad(true); setError("");
@@ -1486,7 +1551,7 @@ Rules:
             {skills.map((s,i)=><SkillRow key={s} skill={s} rating={ratings[s]||0} onChange={v=>setRatings(r=>({...r,[s]:v}))} isTop={s===meta.topPriority}/>)}
             {skills.length>0&&(
               <div style={{display:"flex",justifyContent:"space-between",marginTop:"1rem"}}>
-                <Btn variant="secondary" onClick={()=>{ setError(""); setPhase(selJob?PH.JOB_DETAIL:PH.HOME); }}>← Back to Job</Btn>
+                <Btn variant="secondary" onClick={()=>{ setError(""); const ph=selJob?PH.JOB_DETAIL:PH.HOME; sessionStorage.setItem("ej_phase",ph); setPhase(ph); }}>← Back to Job</Btn>
                 <div style={{display:"flex",alignItems:"center",gap:"1rem"}}>
                   {loading&&<Spinner/>}
                   <Btn onClick={getRec} disabled={loading||skills.some(s=>!ratings[s])}>{loading?"Scoring...":"See My Match Score →"}</Btn>
