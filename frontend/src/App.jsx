@@ -79,7 +79,7 @@ const JOB_TYPES = ["Full-time","Part-time","Contract","Freelance","Internship"];
 
 /* ── phases ── */
 const PH = {
-  AUTH:"auth", ROLE_PICK:"role_pick", JOB_DETAIL:"job_detail",
+  LOADING:"loading", AUTH:"auth", ROLE_PICK:"role_pick", JOB_DETAIL:"job_detail",
   CAND_PROFILE:"cand_profile", CAND_BUCKETS:"cand_buckets", HOME:"home",
   JD:"jd", SKILLS:"skills", REC:"rec", RESUME:"resume", ATS:"ats", CL:"cl",
   CO_PROFILE:"co_profile", CO_HOME:"co_home", CO_POST:"co_post",
@@ -380,12 +380,14 @@ function CandidateRow({c,onClick,rank,delay=0}) {
    MAIN APP
 ══════════════════════════ */
 export default function App() {
-  const [phase,setPhase]   = useState(PH.AUTH);
+  const [phase,setPhase]   = useState(PH.LOADING);
   const [user,setUser]     = useState(null);
   const [loading,setLoad]  = useState(false);
   const [error,setError]   = useState("");
-  const [authMode,setAuthMode]       = useState("signin");
-  const [authPersona,setAuthPersona] = useState("candidate");
+  const urlMode = new URLSearchParams(window.location.search).get("mode");
+  const [authMode,setAuthMode]       = useState(urlMode==="signup"?"signup":"signin");
+  const urlPersona = new URLSearchParams(window.location.search).get("persona");
+  const [authPersona,setAuthPersona] = useState(urlPersona==="company"?"company":"candidate");
   const [email,setEmail]     = useState("");
   const [password,setPassword] = useState("");
 
@@ -789,14 +791,30 @@ export default function App() {
           </div>
         )}
 
+        {/* ═══ LOADING ═══ */}
+        {phase===PH.LOADING&&(
+          <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"60vh",gap:"1rem",animation:"fadeIn 0.3s ease"}}>
+            <div style={{fontFamily:"'Syne',sans-serif",fontSize:"1.5rem",fontWeight:800,color:T.charcoal}}>
+              Easy<span style={{color:T.gold}}>Job</span>
+            </div>
+            <Spinner/>
+            <p style={{color:T.muted,fontSize:"0.8rem"}}>Getting things ready...</p>
+          </div>
+        )}
+
         {/* ═══ AUTH ═══ */}
         {phase===PH.AUTH&&(
           <Card>
             <div style={{textAlign:"center",paddingBottom:"0.5rem"}}>
               <div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>👋</div>
-              <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"1.2rem",color:T.charcoal,margin:"0 0 0.3rem"}}>Welcome to EasyJob</h2>
-              <p style={{color:T.muted,fontSize:"0.83rem",margin:"0 0 1.5rem"}}>AI-powered career intelligence, built for everyone</p>
-
+              <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"1.2rem",color:T.charcoal,margin:"0 0 0.3rem"}}>
+                {authPersona==="company"?"Welcome, Hiring Team":"Welcome to EasyJob"}
+              </h2>
+              <p style={{color:T.muted,fontSize:"0.83rem",margin:"0 0 1.5rem"}}>
+                {authPersona==="company"
+                  ?"Post roles, build skill tests, and find your best candidates"
+                  :"AI-powered career intelligence, built for you"}
+              </p>
               <p style={{color:T.text,fontSize:"0.82rem",fontWeight:600,margin:"0 0 0.75rem"}}>I am a...</p>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.75rem",marginBottom:"1.25rem"}}>
                 {[
