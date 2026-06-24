@@ -509,7 +509,7 @@ export default function App() {
   async function googleAuth() {
     setLoad(true);
     window.history.replaceState(null,"",window.location.pathname);
-    const {error} = await supabase.auth.signInWithOAuth({provider:"google",options:{redirectTo:window.location.origin}});
+    const {error} = await supabase.auth.signInWithOAuth({provider:"google",options:{redirectTo:window.location.origin+"/app"}});
     if (error) { setError(error.message); setLoad(false); }
   }
 
