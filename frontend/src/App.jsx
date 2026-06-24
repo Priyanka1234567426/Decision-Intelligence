@@ -716,7 +716,7 @@ export default function App() {
       <div style={{maxWidth:720,margin:"0 auto"}}>
 
         {/* HEADER */}
-        <header style={{marginBottom:"1.5rem",animation:"fadeUp 0.3s ease"}}>
+         {phase!==PH.LANDING&&<header style={{marginBottom:"1.5rem",animation:"fadeUp 0.3s ease"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0.75rem 1rem",background:T.cardHi,border:`1px solid ${T.border}`,borderRadius:14}}>
             {/* logo */}
             <h1 style={{fontFamily:"'Syne',sans-serif",fontSize:"1.5rem",fontWeight:800,color:T.charcoal,margin:0}}>
@@ -781,7 +781,7 @@ export default function App() {
             </div>
           </div>
           <p style={{textAlign:"center",color:T.muted,fontSize:"0.72rem",margin:"0.4rem 0 0"}}>AI-Powered Career Intelligence · Global</p>
-        </header>
+        </header>}
 
         {/* ERROR */}
         {error&&(
