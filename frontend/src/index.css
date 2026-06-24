@@ -14,7 +14,7 @@ html { font-size: 16px; scroll-behavior: smooth; }
   --border:   #D4D4D4;
   --text:     #1C1C1E;
   --muted:    #777777;
-  --font:     'DM Sans', system-ui, sans-serif;
+  --font:     'Inter', system-ui, sans-serif;
   --font-hd:  'Syne', sans-serif;
   --r-sm:     8px;
   --r-md:     12px;

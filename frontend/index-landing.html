@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>EasyJob · AI Career Intelligence</title>
+  <meta name="description" content="AI-powered career intelligence for candidates and companies. Real skill tests. Honest match scores. Tailored resumes."/>
+  <meta property="og:title" content="EasyJob · AI Career Intelligence"/>
+  <meta property="og:description" content="Know where you stand before you apply."/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#F0F0F0;--card:#FFFFFF;--char:#2C2C2E;--gold:#C9962A;
+      --gold-lt:#F5E6C8;--gold-dk:#9A6F1A;--border:#D4D4D4;
+      --text:#1C1C1E;--muted:#777777;
+    }
+    html{scroll-behavior:smooth}
+    body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;overflow-x:hidden}
+    h1,h2,h3,h4{font-family:'Syne',sans-serif}
+    a{text-decoration:none;color:inherit}
+
+    /* NAV */
+    nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,0.95);backdrop-filter:blur(8px);border-bottom:0.5px solid var(--border);padding:0 2rem;height:64px;display:flex;align-items:center;justify-content:space-between}
+    .logo{font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;color:var(--char)}
+    .logo span{color:var(--gold)}
+    .nav-links{display:flex;gap:2rem}
+    .nav-links a{font-size:0.85rem;color:var(--muted);transition:color 0.2s}
+    .nav-links a:hover{color:var(--char)}
+    .nav-ctas{display:flex;gap:0.5rem}
+    .btn{display:inline-flex;align-items:center;gap:6px;border:none;border-radius:10px;padding:9px 20px;font-size:0.85rem;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;transition:all 0.18s}
+    .btn-char{background:var(--char);color:#fff}
+    .btn-char:hover{background:#444;transform:translateY(-1px)}
+    .btn-gold{background:var(--gold);color:#fff}
+    .btn-gold:hover{background:var(--gold-dk);transform:translateY(-1px)}
+    .btn-outline{background:transparent;color:var(--char);border:1.5px solid var(--border)}
+    .btn-outline:hover{border-color:var(--char);transform:translateY(-1px)}
+    .btn-lg{padding:13px 28px;font-size:0.92rem;border-radius:12px}
+
+    /* HERO */
+    .hero{background:#fff;padding:7rem 2rem 6rem;text-align:center;position:relative;overflow:hidden;border-bottom:0.5px solid var(--border)}
+    .hero-badge{display:inline-flex;align-items:center;gap:6px;background:var(--gold-lt);color:var(--gold-dk);font-size:0.72rem;font-weight:700;padding:5px 14px;border-radius:20px;border:1px solid var(--gold);margin-bottom:1.5rem;letter-spacing:0.05em}
+    .hero-badge span{width:6px;height:6px;border-radius:50%;background:var(--gold);display:inline-block}
+    .hero h1{font-size:clamp(2.2rem,5vw,3.8rem);font-weight:800;color:var(--char);line-height:1.12;margin-bottom:1.25rem}
+    .hero h1 em{color:var(--gold);font-style:normal}
+    .hero p{font-size:1.05rem;color:var(--muted);max-width:580px;margin:0 auto 2.5rem;line-height:1.75}
+    .hero-btns{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;margin-bottom:3rem}
+    .hero-proof{display:flex;align-items:center;justify-content:center;gap:1.5rem;flex-wrap:wrap}
+    .proof-item{display:flex;align-items:center;gap:6px;font-size:0.78rem;color:var(--muted)}
+    .proof-dot{width:5px;height:5px;border-radius:50%;background:var(--gold);display:inline-block}
+
+    /* DECO shapes */
+    .deco{position:absolute;opacity:0.06;pointer-events:none}
+    .rhombus{background:var(--gold);transform:rotate(45deg)}
+    .circle-d{border-radius:50%;background:var(--char)}
+
+    /* STATS */
+    .stats{background:var(--char);padding:2.5rem 2rem}
+    .stats-inner{max-width:900px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}
+    .stat{text-align:center;padding:1rem}
+    .stat-num{font-family:'Syne',sans-serif;font-size:2rem;font-weight:800;color:var(--gold)}
+    .stat-label{font-size:0.78rem;color:rgba(255,255,255,0.5);margin-top:4px}
+
+    /* SECTIONS */
+    .section{padding:6rem 2rem}
+    .container{max-width:1100px;margin:0 auto}
+    .section-eyebrow{font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--gold);margin-bottom:0.6rem}
+    .section-title{font-size:clamp(1.6rem,3vw,2.4rem);font-weight:800;color:var(--char);line-height:1.2;margin-bottom:0.85rem}
+    .section-body{font-size:0.95rem;color:var(--muted);line-height:1.75;max-width:500px}
+
+    /* CANDIDATE SECTION */
+    .cand-section{background:var(--bg)}
+    .split{display:grid;grid-template-columns:1fr 1fr;gap:4rem;align-items:center}
+    .split.reverse{direction:rtl}
+    .split.reverse>*{direction:ltr}
+
+    /* JD rhombus visual */
+    .jd-rhombus{background:var(--char);border-radius:20px;padding:1.75rem;transform:rotate(5deg);position:relative;margin:1.5rem 0}
+    .jd-rhombus-inner{transform:rotate(-5deg)}
+    .jd-lines{display:flex;flex-direction:column;gap:7px;margin-top:1rem}
+    .jd-line{height:9px;border-radius:5px;background:rgba(255,255,255,0.12)}
+    .jd-tag{display:inline-flex;align-items:center;gap:4px;background:rgba(201,150,42,0.2);color:var(--gold);font-size:0.68rem;font-weight:600;padding:3px 10px;border-radius:20px;margin-top:0.75rem}
+
+    /* Score cards */
+    .mini-cards{display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-top:0.75rem}
+    .mini-card{border-radius:12px;padding:1rem}
+    .mini-card.light{background:#fff;border:0.5px solid var(--border)}
+    .mini-card.dark{background:var(--char)}
+    .mini-num{font-family:'Syne',sans-serif;font-size:1.8rem;font-weight:800}
+    .mini-label{font-size:0.7rem;margin-top:2px}
+
+    /* FLOW STEPS */
+    .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-top:3rem}
+    .step-card{background:#fff;border:0.5px solid var(--border);border-radius:16px;padding:1.25rem;transition:all 0.2s;cursor:default}
+    .step-card:hover{border-color:var(--char);transform:translateY(-4px);box-shadow:0 8px 24px rgba(0,0,0,0.08)}
+    .step-num{font-family:'Syne',sans-serif;font-size:0.6rem;font-weight:800;color:var(--border);margin-bottom:0.85rem;letter-spacing:0.08em}
+    .step-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.25rem;margin-bottom:0.75rem}
+    .step-card h3{font-size:0.88rem;font-weight:600;color:var(--char);margin-bottom:0.35rem;font-family:'Inter',sans-serif}
+    .step-card p{font-size:0.75rem;color:var(--muted);line-height:1.55}
+
+    /* COMPANY SECTION */
+    .co-section{background:#fff;border-top:0.5px solid var(--border)}
+
+    /* Circle visual */
+    .circle-visual{position:relative;height:280px;display:flex;align-items:center;justify-content:center}
+    .circle-main{width:180px;height:180px;border-radius:50%;background:var(--gold);display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;z-index:2}
+    .circle-main-num{font-family:'Syne',sans-serif;font-size:2.5rem;font-weight:800;color:#fff}
+    .circle-main-label{font-size:0.7rem;color:rgba(255,255,255,0.8);text-align:center;padding:0 1rem;line-height:1.4}
+    .circle-ring{position:absolute;border:1.5px solid rgba(44,44,46,0.1);border-radius:50%}
+    .floating-badge{position:absolute;background:#fff;border:0.5px solid var(--border);border-radius:10px;padding:7px 12px;box-shadow:0 4px 12px rgba(0,0,0,0.08)}
+    .insight-strip{background:var(--bg);border-radius:12px;padding:1rem 1.25rem;border-left:3px solid var(--gold);margin-top:1rem}
+    .insight-label{font-size:0.68rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:3px}
+    .insight-text{font-size:0.8rem;color:var(--text);line-height:1.6}
+
+    /* PILLS */
+    .pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:1.25rem}
+    .pill{font-size:0.72rem;font-weight:600;padding:4px 12px;border-radius:20px;border:1px solid}
+    .pill-gold{background:var(--gold-lt);color:var(--gold-dk);border-color:var(--gold)}
+    .pill-dark{background:var(--char);color:#fff;border-color:var(--char)}
+
+    /* TESTIMONIALS */
+    .testi-section{background:var(--char);padding:5rem 2rem}
+    .testi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;max-width:950px;margin:2rem auto 0}
+    .testi-card{background:rgba(255,255,255,0.05);border:0.5px solid rgba(255,255,255,0.08);border-radius:14px;padding:1.5rem}
+    .testi-stars{color:var(--gold);font-size:0.75rem;margin-bottom:0.75rem;letter-spacing:2px}
+    .testi-text{font-size:0.84rem;color:rgba(255,255,255,0.75);line-height:1.7;margin-bottom:1.25rem}
+    .testi-author{display:flex;align-items:center;gap:10px}
+    .testi-avatar{width:34px;height:34px;border-radius:50%;background:var(--gold);display:flex;align-items:center;justify-content:center;font-size:0.78rem;font-weight:700;color:#fff;flex-shrink:0}
+    .testi-name{font-size:0.82rem;font-weight:600;color:#fff}
+    .testi-role{font-size:0.7rem;color:rgba(255,255,255,0.4)}
+
+    /* CTA SECTION */
+    .cta-section{background:#fff;padding:6rem 2rem;text-align:center;border-top:0.5px solid var(--border)}
+    .cta-section h2{font-size:clamp(1.6rem,3vw,2.2rem);font-weight:800;color:var(--char);margin-bottom:0.85rem}
+    .cta-section p{font-size:0.95rem;color:var(--muted);max-width:500px;margin:0 auto 2.5rem;line-height:1.75}
+    .cta-cards{display:grid;grid-template-columns:1fr 1fr;gap:1rem;max-width:600px;margin:0 auto}
+    .cta-card{border:1.5px solid var(--border);border-radius:16px;padding:1.75rem 1.25rem;text-align:center;cursor:pointer;transition:all 0.2s}
+    .cta-card:hover{border-color:var(--char);transform:translateY(-3px);box-shadow:0 8px 20px rgba(0,0,0,0.08)}
+    .cta-card.gold-border:hover{border-color:var(--gold)}
+    .cta-icon{font-size:2rem;margin-bottom:0.75rem}
+    .cta-card h3{font-size:0.95rem;font-weight:700;color:var(--char);margin-bottom:0.35rem;font-family:'Inter',sans-serif}
+    .cta-card p{font-size:0.78rem;color:var(--muted);line-height:1.5}
+
+    footer{background:var(--char);padding:2rem;text-align:center}
+    footer p{font-size:0.75rem;color:rgba(255,255,255,0.3)}
+
+    @media(max-width:720px){
+      .split,.cta-cards{grid-template-columns:1fr}
+      .split.reverse{direction:ltr}
+      .stats-inner{grid-template-columns:repeat(2,1fr)}
+      .nav-links{display:none}
+      .hero h1{font-size:2rem}
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="logo">Easy<span>Job</span></div>
+    <div class="nav-links">
+      <a href="#how">How it works</a>
+      <a href="#candidate">Candidates</a>
+      <a href="#company">Companies</a>
+      <a href="#about">About</a>
+    </div>
+    <div class="nav-ctas">
+      <a href="/app" class="btn btn-outline">Sign in</a>
+      <a href="/app" class="btn btn-gold">Get started free</a>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <div class="deco rhombus" style="width:300px;height:300px;top:-120px;right:-80px"></div>
+    <div class="deco circle-d" style="width:120px;height:120px;bottom:20px;left:4%"></div>
+    <div class="deco rhombus" style="width:120px;height:120px;bottom:-40px;left:35%;background:var(--char)"></div>
+
+    <div class="hero-badge"><span></span> Now in beta · Global launch</div>
+    <h1>The smartest way<br>to grow your career</h1>
+    <p>EasyJob gives every candidate and every company a clear, honest picture — matched skills, real scores, and AI that works for both sides of the table.</p>
+    <div class="hero-btns">
+      <a href="/app" class="btn btn-char btn-lg">Find my next role →</a>
+      <a href="/app" class="btn btn-gold btn-lg">Start hiring smarter →</a>
+    </div>
+    <div class="hero-proof">
+      <div class="proof-item"><span class="proof-dot"></span>Free for candidates</div>
+      <div class="proof-item"><span class="proof-dot"></span>No resume guesswork</div>
+      <div class="proof-item"><span class="proof-dot"></span>Real skill tests</div>
+      <div class="proof-item"><span class="proof-dot"></span>AI-powered · Global</div>
+    </div>
+  </section>
+
+  <div class="stats">
+    <div class="stats-inner">
+      <div class="stat"><div class="stat-num">5×</div><div class="stat-label">Faster shortlisting</div></div>
+      <div class="stat"><div class="stat-num">100%</div><div class="stat-label">Honest match score</div></div>
+      <div class="stat"><div class="stat-num">AI</div><div class="stat-label">Skill extraction</div></div>
+      <div class="stat"><div class="stat-num">Global</div><div class="stat-label">From day one</div></div>
+    </div>
+  </div>
+
+  <section class="section cand-section" id="candidate">
+    <div class="deco rhombus" style="width:180px;height:180px;top:-60px;right:6%;opacity:0.07"></div>
+    <div class="container">
+      <div class="split">
+        <div>
+          <div class="section-eyebrow">For candidates</div>
+          <div class="section-title">Your career intelligence,<br>all in one place</div>
+          <div class="section-body">See exactly how well you match any role, get a resume tailored to that specific company, and understand where you stand in the market — before you hit apply.</div>
+          <div class="pills">
+            <span class="pill pill-gold">AI skill matching</span>
+            <span class="pill pill-gold">Tailored resume</span>
+            <span class="pill pill-gold">ATS review</span>
+            <span class="pill pill-gold">Cover letter</span>
+            <span class="pill pill-gold">Market score</span>
+          </div>
+          <a href="/app" class="btn btn-char btn-lg" style="margin-top:1.75rem;display:inline-flex">Start for free →</a>
+        </div>
+        <div>
+          <div class="jd-rhombus">
+            <div class="jd-rhombus-inner">
+              <div style="font-size:0.7rem;color:rgba(255,255,255,0.5);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.06em">Job description</div>
+              <div style="font-size:0.9rem;font-weight:600;color:#fff;margin-bottom:2px">Senior Data Analyst · Zepto</div>
+              <div style="font-size:0.75rem;color:rgba(255,255,255,0.55)">Hyderabad · Full-time</div>
+              <div class="jd-lines">
+                <div class="jd-line" style="width:100%"></div>
+                <div class="jd-line" style="width:88%"></div>
+                <div class="jd-line" style="width:94%"></div>
+                <div class="jd-line" style="width:72%"></div>
+                <div class="jd-line" style="width:85%"></div>
+              </div>
+              <div class="jd-tag">Match score: 84% ✓</div>
+            </div>
+          </div>
+          <div class="mini-cards">
+            <div class="mini-card light">
+              <div style="font-size:0.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Market score</div>
+              <div class="mini-num" style="color:var(--char)">71<span style="font-size:1rem;color:var(--muted)">%</span></div>
+              <div class="mini-label" style="color:var(--gold);font-weight:600;font-size:0.72rem">↑ Improving</div>
+            </div>
+            <div class="mini-card dark">
+              <div style="font-size:0.68rem;color:rgba(255,255,255,0.45);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Shortlisted</div>
+              <div class="mini-num" style="color:var(--gold)">3</div>
+              <div class="mini-label" style="color:rgba(255,255,255,0.45);font-size:0.72rem">of 12 applied</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="steps" id="how">
+        <div class="step-card">
+          <div class="step-num">STEP 01</div>
+          <div class="step-icon" style="background:var(--gold-lt)">📋</div>
+          <h3>Find your match</h3>
+          <p>Browse real jobs matched to your profile, or paste any JD from LinkedIn or Naukri.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-num">STEP 02</div>
+          <div class="step-icon" style="background:#E3E3E3">⚡</div>
+          <h3>AI reads the role</h3>
+          <p>7–9 critical skills extracted from the JD in seconds. No manual tagging.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-num">STEP 03</div>
+          <div class="step-icon" style="background:var(--gold-lt)">🎯</div>
+          <h3>See your real score</h3>
+          <p>Rate your skills honestly. Get a match score and a clear apply or build recommendation.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-num">STEP 04</div>
+          <div class="step-icon" style="background:#E3E3E3">📄</div>
+          <h3>Resume tailored</h3>
+          <p>Your resume rewritten for this exact role, this exact company, this exact JD.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-num">STEP 05</div>
+          <div class="step-icon" style="background:var(--gold-lt)">✉️</div>
+          <h3>Cover letter ready</h3>
+          <p>Specific, confident, and unique to this application. Ready in seconds.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section co-section" id="company">
+    <div class="deco circle-d" style="width:240px;height:240px;bottom:-80px;left:-60px;opacity:0.04"></div>
+    <div class="container">
+      <div class="split reverse">
+        <div>
+          <div class="section-eyebrow">For companies</div>
+          <div class="section-title">Build a pipeline of<br>candidates who can<br>actually do the job</div>
+          <div class="section-body">Post a role, attach a skill test designed by your team or generated by AI from the JD, and receive a ranked pipeline — sorted by real skill scores, not keyword density.</div>
+          <div class="pills">
+            <span class="pill pill-dark">Post roles</span>
+            <span class="pill pill-dark">AI skill tests</span>
+            <span class="pill pill-dark">Ranked pipeline</span>
+            <span class="pill pill-dark">AI hiring insights</span>
+          </div>
+          <a href="/app" class="btn btn-gold btn-lg" style="margin-top:1.75rem;display:inline-flex">Start hiring smarter →</a>
+        </div>
+        <div>
+          <div class="circle-visual">
+            <div class="circle-ring" style="width:260px;height:260px"></div>
+            <div class="circle-ring" style="width:210px;height:210px"></div>
+            <div class="circle-main">
+              <div class="circle-main-num">84%</div>
+              <div class="circle-main-label">top candidate<br>skill score</div>
+            </div>
+            <div class="floating-badge" style="top:14px;right:30px">
+              <div style="font-size:0.65rem;color:var(--muted)">Ranked #1</div>
+              <div style="font-size:0.82rem;font-weight:600;color:var(--char)">Priya S.</div>
+            </div>
+            <div class="floating-badge" style="bottom:24px;left:14px;background:var(--gold-lt);border-color:var(--gold)">
+              <div style="font-size:0.65rem;color:var(--gold-dk)">38 applied</div>
+              <div style="font-size:0.82rem;font-weight:600;color:var(--gold-dk)">3 shortlisted</div>
+            </div>
+          </div>
+          <div class="insight-strip">
+            <div class="insight-label">AI insight</div>
+            <div class="insight-text">Top 2 candidates score above 80% on SQL. Consider adding a case study question to differentiate the final shortlist.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="testi-section">
+    <div class="container" style="text-align:center">
+      <div class="section-eyebrow" style="color:var(--gold)">Early users</div>
+      <h2 style="font-size:1.8rem;color:#fff;margin-bottom:0.25rem">What beta users are saying</h2>
+      <div class="testi-grid">
+        <div class="testi-card">
+          <div class="testi-stars">★★★★★</div>
+          <div class="testi-text">"I always wondered if I was even qualified for the roles I was applying to. EasyJob gave me a clear number and told me exactly what to focus on next."</div>
+          <div class="testi-author"><div class="testi-avatar">A</div><div><div class="testi-name">Aisha R.</div><div class="testi-role">Senior Analyst, Hyderabad</div></div></div>
+        </div>
+        <div class="testi-card">
+          <div class="testi-stars">★★★★★</div>
+          <div class="testi-text">"The skill test feature changed how we hire. We now spend interview time on people we know can do the work. Our shortlist quality is night and day."</div>
+          <div class="testi-author"><div class="testi-avatar">R</div><div><div class="testi-name">Rahul M.</div><div class="testi-role">Head of Talent, Zepto</div></div></div>
+        </div>
+        <div class="testi-card">
+          <div class="testi-stars">★★★★★</div>
+          <div class="testi-text">"Three interviews in two weeks after months of silence. The tailored resume made my applications actually land. I could see exactly why each one was different."</div>
+          <div class="testi-author"><div class="testi-avatar">P</div><div><div class="testi-name">Priya K.</div><div class="testi-role">Product Manager, Bangalore</div></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta-section" id="about">
+    <div class="container">
+      <h2>Ready to find where you stand?</h2>
+      <p>Join the beta today. Free for candidates, built for the global job market, powered by Claude AI.</p>
+      <div class="cta-cards">
+        <a href="/app" class="cta-card">
+          <div class="cta-icon">👤</div>
+          <h3>I am a candidate</h3>
+          <p>Match to real jobs, get your resume tailored, and grow your market score.</p>
+        </a>
+        <a href="/app" class="cta-card gold-border">
+          <div class="cta-icon">🏢</div>
+          <h3>I am hiring</h3>
+          <p>Post roles, build skill tests, and receive a ranked pipeline that saves your team hours.</p>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>EasyJob · Beta · Powered by Claude AI · Built for the global job market</p>
+  </footer>
+
+</body>
+</html>
